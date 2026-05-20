@@ -1,7 +1,7 @@
 // app/layout.jsx
-
-import { Inter } from 'next/font/google';  // font bersih & profesional
+import { Inter } from 'next/font/google';
 import './globals.css';
+import LayoutClient from '@/components/LayoutClient';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -16,9 +16,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="id" className={inter.className}>
-      <body className="min-h-screen bg-pure-black text-pure-white antialiased">
-        {/* Di sini nantinya akan dimasukkan Navbar / Sidebar sesuai grup rute */}
-        {children}
+      <body className="min-h-screen bg-black text-white antialiased">
+        {/* Komponen client yang membungkus Sidebar + konten */}
+        <LayoutClient>{children}</LayoutClient>
       </body>
     </html>
   );
