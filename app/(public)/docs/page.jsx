@@ -1,5 +1,5 @@
 // app/(public)/docs/page.jsx
-import ApiCard from '@/components/ApiCard';
+import ApiCard from '../../../components/ApiCard';
 
 export default function DocsPage() {
   // Dummy data beberapa API (sesuai blueprint)
