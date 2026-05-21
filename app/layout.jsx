@@ -1,9 +1,9 @@
 // app/layout.jsx
-import { Inter } from 'next/font/google';
+import { JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import LayoutClient from '../components/LayoutClient';
 
-const inter = Inter({ subsets: ['latin'] });
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'] });
 
 export const metadata = {
   title: 'XT4 API – RESTful Platform',
@@ -15,7 +15,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id" className={inter.className}>
+    <html lang="id" className={jetbrainsMono.className}>
       <body className="min-h-screen bg-black text-white antialiased">
         {/* Komponen client yang membungkus Sidebar + konten */}
         <LayoutClient>{children}</LayoutClient>
