@@ -1,7 +1,7 @@
-// app/(admin)/god-mode/apis/page.jsx
 'use client';
 
 import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function GodModeApisPage() {
   const [formData, setFormData] = useState({
@@ -12,6 +12,7 @@ export default function GodModeApisPage() {
     responseExample: '',
   });
   const [showAlert, setShowAlert] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -20,11 +21,30 @@ export default function GodModeApisPage() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Simulasi penyimpanan data dummy
+    setLoading(true);
+
+    // Insert ke tabel api_endpoints
+    const { error } = await supabase.from('api_endpoints').insert([
+      {
+        name: formData.name,
+        category: formData.category,
+        path: formData.path,
+        method: formData.method,
+        response_example: formData.responseExample,
+        is_active: true,
+      },
+    ]);
+
+    if (error) {
+      alert('Gagal menambahkan endpoint: ' + error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Sukses: tampilkan alert, reset form
     setShowAlert(true);
-    // Reset form
     setFormData({
       name: '',
       category: 'Downloader',
@@ -32,7 +52,8 @@ export default function GodModeApisPage() {
       method: 'GET',
       responseExample: '',
     });
-    // Sembunyikan alert setelah 3 detik
+    setLoading(false);
+
     setTimeout(() => {
       setShowAlert(false);
     }, 3000);
@@ -64,10 +85,7 @@ export default function GodModeApisPage() {
       >
         {/* Nama API */}
         <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-text-secondary mb-1.5"
-          >
+          <label htmlFor="name" className="block text-sm font-medium text-text-secondary mb-1.5">
             Nama API
           </label>
           <input
@@ -84,10 +102,7 @@ export default function GodModeApisPage() {
 
         {/* Kategori */}
         <div>
-          <label
-            htmlFor="category"
-            className="block text-sm font-medium text-text-secondary mb-1.5"
-          >
+          <label htmlFor="category" className="block text-sm font-medium text-text-secondary mb-1.5">
             Kategori
           </label>
           <select
@@ -106,10 +121,7 @@ export default function GodModeApisPage() {
 
         {/* Path Endpoint */}
         <div>
-          <label
-            htmlFor="path"
-            className="block text-sm font-medium text-text-secondary mb-1.5"
-          >
+          <label htmlFor="path" className="block text-sm font-medium text-text-secondary mb-1.5">
             Path Endpoint
           </label>
           <input
@@ -126,10 +138,7 @@ export default function GodModeApisPage() {
 
         {/* Method */}
         <div>
-          <label
-            htmlFor="method"
-            className="block text-sm font-medium text-text-secondary mb-1.5"
-          >
+          <label htmlFor="method" className="block text-sm font-medium text-text-secondary mb-1.5">
             Method
           </label>
           <select
@@ -146,10 +155,7 @@ export default function GodModeApisPage() {
 
         {/* Contoh Response JSON */}
         <div>
-          <label
-            htmlFor="responseExample"
-            className="block text-sm font-medium text-text-secondary mb-1.5"
-          >
+          <label htmlFor="responseExample" className="block text-sm font-medium text-text-secondary mb-1.5">
             Contoh Response JSON
           </label>
           <textarea
@@ -165,9 +171,10 @@ export default function GodModeApisPage() {
 
         <button
           type="submit"
-          className="w-full py-3 bg-pure-white text-pure-black font-semibold rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-pure-white focus:ring-offset-2 focus:ring-offset-pure-black"
+          disabled={loading}
+          className="w-full py-3 bg-pure-white text-pure-black font-semibold rounded-lg hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-pure-white focus:ring-offset-2 focus:ring-offset-pure-black disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Tambah Endpoint
+          {loading ? 'Menyimpan...' : 'Tambah Endpoint'}
         </button>
       </form>
 
