@@ -39,14 +39,12 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    // Kirim data pendaftaran ke Supabase Auth
+    // 1. Daftar melalui Supabase Auth
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: {
-          username, // disimpan di raw_user_meta_data -> dipakai trigger
-        },
+        data: { username },
       },
     });
 
@@ -56,11 +54,31 @@ export default function RegisterPage() {
       return;
     }
 
-    // Cek jika user sudah ada (email terdaftar), Supabase kadang tidak error
+    // 2. Cek jika user sudah terdaftar (identities kosong)
     if (data.user && data.user.identities && data.user.identities.length === 0) {
       setError('Email sudah terdaftar. Silakan gunakan email lain atau login.');
       setLoading(false);
       return;
+    }
+
+    // 3. Insert / upsert data ke tabel public.users
+    const userId = data.user.id;
+    const { error: insertError } = await supabase
+      .from('users')
+      .upsert(
+        [
+          {
+            id: userId,
+            username: username,
+            email: email,
+          },
+        ],
+        { onConflict: 'id' }
+      );
+
+    if (insertError) {
+      console.error('Gagal menyimpan data user:', insertError.message);
+      // Tetap lanjut karena auth sudah berhasil
     }
 
     // Berhasil
@@ -69,7 +87,7 @@ export default function RegisterPage() {
     );
     setLoading(false);
 
-    // Reset form setelah sukses
+    // Reset form
     setFormData({
       username: '',
       email: '',
