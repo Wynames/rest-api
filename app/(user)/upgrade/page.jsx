@@ -1,23 +1,65 @@
-// app/(user)/upgrade/page.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function UpgradePage() {
   const [role, setRole] = useState('VIP');
   const [username, setUsername] = useState('');
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState(null); // tetap ada UI, tidak dikirim ke DB
   const [submitted, setSubmitted] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Ambil session user
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUserId(session.user.id);
+      }
+      setLoading(false);
+    };
+    getSession();
+  }, []);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Di sini nanti akan dikirim ke backend/Supabase
+    if (!userId) {
+      alert('Anda harus login terlebih dahulu.');
+      return;
+    }
+
+    // Insert ke tabel upgrade_requests (abaikan file)
+    const { error } = await supabase
+      .from('upgrade_requests')
+      .insert([
+        {
+          user_id: userId,
+          requested_role: role,
+          discord_notes: username, // username Discord sebagai catatan
+        },
+      ]);
+
+    if (error) {
+      alert('Gagal mengirim request: ' + error.message);
+      return;
+    }
+
     setSubmitted(true);
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto py-8 px-4 text-gray-400">
+        Memuat...
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
@@ -26,7 +68,7 @@ export default function UpgradePage() {
         Lakukan transfer sesuai instruksi, lalu kirim bukti pembayaran.
       </p>
 
-      {/* Instruksi Transfer Manual (dummy) */}
+      {/* Instruksi Transfer Manual */}
       <div className="border border-[#333333] rounded-xl bg-[#111111] p-6 mb-8">
         <h2 className="text-white font-semibold mb-3">Instruksi Pembayaran</h2>
         <ul className="space-y-2 text-gray-300 text-sm">
@@ -71,7 +113,7 @@ export default function UpgradePage() {
             />
           </div>
 
-          {/* Upload Bukti */}
+          {/* Upload Bukti (hanya UI) */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Upload Bukti Transfer (Screenshot)
