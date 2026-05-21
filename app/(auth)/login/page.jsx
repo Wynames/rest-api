@@ -1,7 +1,56 @@
-// app/(auth)/login/page.jsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    const { email, password } = formData;
+
+    if (!email || !password) {
+      setError('Email dan password wajib diisi.');
+      return;
+    }
+
+    setLoading(true);
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      // Tampilkan error yang user-friendly
+      if (signInError.message.includes('Invalid login credentials')) {
+        setError('Email atau password salah.');
+      } else {
+        setError(signInError.message);
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Login berhasil → redirect ke dashboard
+    router.push('/dashboard');
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-black px-4">
       {/* Card Login */}
@@ -12,19 +61,28 @@ export default function LoginPage() {
           Silakan login untuk melanjutkan ke dashboard.
         </p>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-500/30 bg-red-900/20 p-3 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
         {/* Form */}
-        <form className="space-y-5">
-          {/* Username / Email */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Email */}
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1.5">
-              Username atau Email
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
+              Email
             </label>
             <input
-              id="username"
-              name="username"
-              type="text"
+              id="email"
+              name="email"
+              type="email"
               required
-              placeholder="johndoe atau john@example.com"
+              placeholder="john@example.com"
+              value={formData.email}
+              onChange={handleChange}
               className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none transition-colors focus:border-white focus:ring-1 focus:ring-white"
             />
           </div>
@@ -40,6 +98,8 @@ export default function LoginPage() {
               type="password"
               required
               placeholder="••••••••"
+              value={formData.password}
+              onChange={handleChange}
               className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none transition-colors focus:border-white focus:ring-1 focus:ring-white"
             />
           </div>
@@ -47,9 +107,10 @@ export default function LoginPage() {
           {/* Tombol Masuk */}
           <button
             type="submit"
-            className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black"
+            disabled={loading}
+            className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Masuk
+            {loading ? 'Memproses...' : 'Masuk'}
           </button>
         </form>
 
