@@ -1,7 +1,7 @@
 // components/ApiCard.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function ApiCard({
   method,
@@ -15,16 +15,93 @@ export default function ApiCard({
   const [activeTab, setActiveTab] = useState('params');
   const [copied, setCopied] = useState(false);
 
+  // State baru untuk fitur "Try it!"
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [paramInputs, setParamInputs] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [realResponse, setRealResponse] = useState('');
+  const [tryError, setTryError] = useState('');
+
+  // Inisialisasi paramInputs setiap kali params berubah
+  useEffect(() => {
+    if (params && params.length > 0) {
+      const initial = {};
+      params.forEach((p) => {
+        initial[p.name] = '';
+      });
+      setParamInputs(initial);
+    } else {
+      setParamInputs({});
+    }
+  }, [params]);
+
   const copyEndpoint = () => {
     navigator.clipboard.writeText(endpoint);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleParamChange = (name, value) => {
+    setParamInputs((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleTryIt = async () => {
+    setTryError('');
+
+    // Validasi API Key wajib
+    if (!apiKeyInput.trim()) {
+      setTryError('API Key wajib diisi.');
+      return;
+    }
+
+    // Validasi parameter required
+    if (params) {
+      for (const param of params) {
+        if (param.required && !paramInputs[param.name]?.trim()) {
+          setTryError(`Parameter '${param.name}' wajib diisi.`);
+          return;
+        }
+      }
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Bangun URL dengan search params
+      const url = new URL(endpoint, window.location.origin);
+      url.searchParams.append('apikey', apiKeyInput.trim());
+
+      // Tambahkan semua parameter dari input
+      Object.entries(paramInputs).forEach(([key, value]) => {
+        if (value.trim()) {
+          url.searchParams.append(key, value.trim());
+        }
+      });
+
+      const response = await fetch(url.toString());
+      const data = await response.json();
+
+      setRealResponse(JSON.stringify(data, null, 2));
+      setActiveTab('response');
+    } catch (error) {
+      setRealResponse(JSON.stringify({ error: 'Gagal melakukan request: ' + error.message }, null, 2));
+      setActiveTab('response');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const methodColors = {
     GET: 'bg-emerald-900/40 text-emerald-400 border-emerald-600',
     POST: 'bg-blue-900/40 text-blue-400 border-blue-600',
   };
+
+  // Menentukan response yang akan ditampilkan: realResponse atau default responseJson
+  const displayResponse = realResponse
+    ? realResponse
+    : typeof responseJson === 'string'
+    ? responseJson
+    : JSON.stringify(responseJson, null, 2);
 
   return (
     <div className="border border-border-dark rounded-xl bg-card-bg overflow-hidden mb-6 transition-shadow hover:shadow-lg">
@@ -104,48 +181,84 @@ export default function ApiCard({
           <div className="p-5">
             {activeTab === 'params' && (
               <div>
-                <table className="w-full text-sm text-left">
-                  <thead className="text-text-secondary uppercase text-xs border-b border-border-dark">
-                    <tr>
-                      <th className="pb-2 font-medium">Nama</th>
-                      <th className="pb-2 font-medium">Tipe</th>
-                      <th className="pb-2 font-medium">Deskripsi</th>
-                      <th className="pb-2 font-medium">Wajib</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {params.map((param, idx) => (
-                      <tr key={idx} className="border-b border-[#2a2a2a] last:border-0">
-                        <td className="py-2 text-pure-white font-mono">{param.name}</td>
-                        <td className="py-2 text-text-secondary">{param.type}</td>
-                        <td className="py-2 text-gray-300">{param.description}</td>
-                        <td className="py-2">
-                          {param.required ? (
-                            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-red-900/30 text-red-400 border border-red-800">
-                              REQUIRED
-                            </span>
-                          ) : (
-                            <span className="text-gray-600">opsional</span>
-                          )}
-                        </td>
+                {params && params.length > 0 && (
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-text-secondary uppercase text-xs border-b border-border-dark">
+                      <tr>
+                        <th className="pb-2 font-medium">Nama</th>
+                        <th className="pb-2 font-medium">Tipe</th>
+                        <th className="pb-2 font-medium">Deskripsi</th>
+                        <th className="pb-2 font-medium">Wajib</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {params.map((param, idx) => (
+                        <tr key={idx} className="border-b border-[#2a2a2a] last:border-0">
+                          <td className="py-2 text-pure-white font-mono">{param.name}</td>
+                          <td className="py-2 text-text-secondary">{param.type}</td>
+                          <td className="py-2 text-gray-300">{param.description}</td>
+                          <td className="py-2">
+                            {param.required ? (
+                              <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-red-900/30 text-red-400 border border-red-800">
+                                REQUIRED
+                              </span>
+                            ) : (
+                              <span className="text-gray-600">opsional</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {/* Form Uji Coba */}
                 <div className="mt-6 space-y-3">
                   <h4 className="text-pure-white font-medium text-sm">Coba Endpoint</h4>
-                  {params.map((param, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2">
-                      <label className="text-sm text-text-secondary sm:w-24">{param.name}</label>
+
+                  {/* Input API Key wajib di paling atas */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <label className="text-sm text-text-secondary sm:w-24">apikey</label>
+                    <div className="flex-1 relative">
                       <input
                         type="text"
-                        placeholder={param.example || `Masukkan ${param.name}`}
-                        className="flex-1 px-3 py-2 bg-pure-black border border-border-dark rounded-md text-pure-white placeholder-gray-600 focus:outline-none focus:border-pure-white transition-colors text-sm"
+                        placeholder="API Key kamu"
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        className="w-full px-3 py-2 bg-pure-black border border-border-dark rounded-md text-pure-white placeholder-gray-600 focus:outline-none focus:border-pure-white transition-colors text-sm"
                       />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-red-400">*</span>
                     </div>
-                  ))}
-                  <button className="mt-3 px-5 py-2 bg-pure-white text-pure-black rounded-md font-medium text-sm hover:bg-gray-200 transition-colors">
-                    Try it!
+                  </div>
+
+                  {/* Input parameter lainnya dari database */}
+                  {params &&
+                    params.map((param, idx) => (
+                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <label className="text-sm text-text-secondary sm:w-24">
+                          {param.name}
+                          {param.required && <span className="text-red-400 ml-1">*</span>}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={param.example || `Masukkan ${param.name}`}
+                          value={paramInputs[param.name] || ''}
+                          onChange={(e) => handleParamChange(param.name, e.target.value)}
+                          className="flex-1 px-3 py-2 bg-pure-black border border-border-dark rounded-md text-pure-white placeholder-gray-600 focus:outline-none focus:border-pure-white transition-colors text-sm"
+                        />
+                      </div>
+                    ))}
+
+                  {tryError && (
+                    <div className="text-red-400 text-xs mt-1">{tryError}</div>
+                  )}
+
+                  <button
+                    onClick={handleTryIt}
+                    disabled={isLoading}
+                    className="mt-3 px-5 py-2 bg-pure-white text-pure-black rounded-md font-medium text-sm hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Memproses...' : 'Try it!'}
                   </button>
                 </div>
               </div>
@@ -159,7 +272,7 @@ export default function ApiCard({
 
             {activeTab === 'response' && (
               <div className="bg-pure-black rounded-lg border border-border-dark p-4 overflow-x-auto">
-                <pre className="text-sm text-green-400 font-mono"><code>{responseJson}</code></pre>
+                <pre className="text-sm text-green-400 font-mono"><code>{displayResponse}</code></pre>
               </div>
             )}
           </div>
