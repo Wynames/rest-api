@@ -2,13 +2,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Client khusus server dengan service role (untuk akses penuh ke database)
+// Client khusus server dengan service role
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Dummy database Waifu & Husbu
+// Dummy database Waifu & Husbu (masih statis)
 const waifuList = [
   { name: 'Mikasa Ackerman', anime: 'Attack on Titan', image: 'https://example.com/mikasa.jpg' },
   { name: 'Rem', anime: 'Re:Zero', image: 'https://example.com/rem.jpg' },
@@ -26,65 +26,38 @@ export async function GET(request) {
   const gender = searchParams.get('gender')?.toLowerCase();
   const apikey = searchParams.get('apikey');
 
-  // 1. VALIDASI 1: API key wajib
+  // Middleware sudah memastikan apikey ada, tetapi kita pertahankan untuk lapisan keamanan tambahan
   if (!apikey) {
     return NextResponse.json(
-      { success: false, message: 'API Key wajib diisi. Tambahkan ?apikey=...' },
+      { success: false, message: 'API Key wajib disertakan!' },
       { status: 401 }
     );
   }
 
-  // 2. VALIDASI 2: Cari API key di tabel api_keys
-  const { data: keyData, error: keyError } = await supabaseAdmin
-    .from('api_keys')
-    .select('user_id, api_key')
-    .eq('api_key', apikey)
-    .maybeSingle(); // bisa null jika tidak ditemukan
+  // Panggil RPC decrement_api_limit untuk pemotongan limit yang aman
+  const { data: isSuccess, error: rpcError } = await supabaseAdmin.rpc(
+    'decrement_api_limit',
+    { api_key_input: apikey }
+  );
 
-  if (keyError || !keyData) {
+  // Jika terjadi error di database
+  if (rpcError) {
+    console.error('RPC error:', rpcError.message);
     return NextResponse.json(
-      { success: false, message: 'API Key tidak valid.' },
-      { status: 401 }
-    );
-  }
-
-  const userId = keyData.user_id;
-
-  // 3. VALIDASI 3: Cek limit user
-  const { data: userData, error: userError } = await supabaseAdmin
-    .from('users')
-    .select('limit_harian')
-    .eq('id', userId)
-    .single();
-
-  if (userError || !userData) {
-    return NextResponse.json(
-      { success: false, message: 'Gagal memverifikasi pengguna.' },
+      { success: false, message: 'Terjadi kesalahan internal.' },
       { status: 500 }
     );
   }
 
-  if (userData.limit_harian <= 0) {
+  // RPC mengembalikan false: key tidak valid atau limit habis
+  if (!isSuccess) {
     return NextResponse.json(
-      { success: false, message: 'Limit harian habis. Silakan upgrade ke paket yang lebih tinggi.' },
+      { success: false, message: 'API Key tidak valid atau Limit harian Anda habis. Silakan upgrade!' },
       { status: 403 }
     );
   }
 
-  // 4. Kurangi limit user sebesar 1
-  const { error: updateError } = await supabaseAdmin
-    .from('users')
-    .update({ limit_harian: userData.limit_harian - 1 })
-    .eq('id', userId);
-
-  if (updateError) {
-    return NextResponse.json(
-      { success: false, message: 'Gagal memperbarui limit.' },
-      { status: 500 }
-    );
-  }
-
-  // 5. Setelah limit dipotong, tangani gender parameter
+  // Jika berhasil (limit terpotong), lanjutkan validasi gender
   if (!gender || (gender !== 'cowo' && gender !== 'cewe')) {
     return NextResponse.json(
       { success: false, message: 'Gender harus "cowo" atau "cewe".' },
@@ -92,6 +65,7 @@ export async function GET(request) {
     );
   }
 
+  // Pilih karakter acak
   const list = gender === 'cowo' ? waifuList : husbuList;
   const randomIndex = Math.floor(Math.random() * list.length);
   const character = list[randomIndex];
