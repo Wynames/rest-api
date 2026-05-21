@@ -37,7 +37,6 @@ export default function LoginPage() {
     });
 
     if (signInError) {
-      // Tampilkan error yang user-friendly
       if (signInError.message.includes('Invalid login credentials')) {
         setError('Email atau password salah.');
       } else {
@@ -47,30 +46,26 @@ export default function LoginPage() {
       return;
     }
 
-    // Login berhasil → redirect ke dashboard
+    // Login berhasil → redirect & refresh
     router.push('/dashboard');
+    router.refresh();
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black px-4">
-      {/* Card Login */}
       <div className="w-full max-w-md rounded-xl border border-[#333333] bg-[#111111] p-8 shadow-2xl">
-        {/* Judul */}
         <h1 className="text-2xl font-bold text-white mb-1">Masuk ke Akun</h1>
         <p className="text-gray-400 text-sm mb-8">
           Silakan login untuk melanjutkan ke dashboard.
         </p>
 
-        {/* Error Message */}
         {error && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-900/20 p-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
               Email
@@ -87,7 +82,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1.5">
               Password
@@ -104,7 +98,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Tombol Masuk */}
           <button
             type="submit"
             disabled={loading}
@@ -114,7 +107,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Tautan ke Register */}
         <p className="mt-6 text-center text-sm text-gray-400">
           Belum punya akun?{' '}
           <Link href="/register" className="font-medium text-white hover:underline">
