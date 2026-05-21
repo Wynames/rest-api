@@ -1,74 +1,78 @@
-// app/(admin)/god-mode/users/page.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function GodModeUsersPage() {
-  // Dummy data user
-  const initialUsers = [
-    {
-      id: 1,
-      username: 'rey',
-      email: 'rey@example.com',
-      role: 'King\'s',
-      status: 'Active',
-    },
-    {
-      id: 2,
-      username: 'lightz',
-      email: 'lightz@mail.com',
-      role: 'Free',
-      status: 'Active',
-    },
-    {
-      id: 3,
-      username: 'darkz',
-      email: 'darkz@mail.com',
-      role: 'Free',
-      status: 'Menunggu', // Menunggu konfirmasi upgrade
-    },
-    {
-      id: 4,
-      username: 'venz',
-      email: 'venz@mail.com',
-      role: 'VIP',
-      status: 'Active',
-    },
-    {
-      id: 5,
-      username: 'xin',
-      email: 'xin@mail.com',
-      role: 'Lord',
-      status: 'Active',
-    },
-    {
-      id: 6,
-      username: 'nova',
-      email: 'nova@mail.com',
-      role: 'Free',
-      status: 'Menunggu',
-    },
-  ];
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const [users, setUsers] = useState(initialUsers);
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, username, email, role, status')
+        .order('created_at', { ascending: false });
 
-  // Handler untuk aksi BANNED (hanya ubah status menjadi Banned secara lokal)
-  const handleBan = (userId) => {
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === userId ? { ...user, status: 'Banned' } : user
-      )
-    );
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Handler untuk aksi PROSES (ubah status Menunggu menjadi Active, simulasi ACC)
-  const handleProcess = (userId) => {
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === userId ? { ...user, status: 'Active' } : user
-      )
-    );
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Handler untuk BANNED: ubah status menjadi 'Banned'
+  const handleBan = async (userId) => {
+    const { error } = await supabase
+      .from('users')
+      .update({ status: 'Banned' })
+      .eq('id', userId);
+
+    if (error) {
+      alert('Gagal melakukan banned: ' + error.message);
+      return;
+    }
+    // Segarkan data
+    fetchUsers();
   };
+
+  // Handler untuk PROSES: ubah status 'Menunggu' menjadi 'Active'
+  const handleProcess = async (userId) => {
+    const { error } = await supabase
+      .from('users')
+      .update({ status: 'Active' })
+      .eq('id', userId);
+
+    if (error) {
+      alert('Gagal memproses: ' + error.message);
+      return;
+    }
+    fetchUsers();
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto py-8 px-4 text-text-secondary">
+        Memuat data pengguna...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto py-8 px-4 text-red-400">
+        Gagal memuat data: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 space-y-8">
@@ -97,7 +101,7 @@ export default function GodModeUsersPage() {
                 key={user.id}
                 className="border-b border-[#2a2a2a] last:border-0 hover:bg-white/5 transition-colors"
               >
-                <td className="py-3 text-text-secondary">{user.id}</td>
+                <td className="py-3 text-text-secondary text-xs font-mono">{user.id.substring(0, 8)}...</td>
                 <td className="py-3 font-medium">{user.username}</td>
                 <td className="py-3 text-text-secondary">{user.email}</td>
                 <td className="py-3">
@@ -158,7 +162,7 @@ export default function GodModeUsersPage() {
       </div>
 
       <p className="text-text-secondary text-xs">
-        * Data di atas merupakan simulasi dummy. Integrasi dengan database nyata dilakukan pada tahap produksi.
+        * Perubahan status langsung tersimpan ke database.
       </p>
     </div>
   );
