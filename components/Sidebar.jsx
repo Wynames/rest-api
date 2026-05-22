@@ -1,45 +1,95 @@
-// components/Sidebar.jsx
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
-// Kelompok menu
-const menuGroups = [
-  {
+export default function Sidebar({ isOpen, onClose }) {
+  const pathname = usePathname();
+  const [session, setSession] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+
+      if (session?.user) {
+        // Ambil role dari tabel users
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        if (!error && userData) {
+          setUserRole(userData.role);
+        }
+      } else {
+        setUserRole(null);
+      }
+    };
+
+    checkUser();
+
+    // Listen perubahan auth state
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) setUserRole(null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Grup menu dinamis
+  const menuGroups = [];
+
+  // PUBLIC selalu ada
+  menuGroups.push({
     title: 'PUBLIC',
     items: [
       { label: 'Home', href: '/' },
       { label: 'Docs', href: '/docs' },
       { label: 'Pricing', href: '/pricing' },
     ],
-  },
-  {
-    title: 'AUTH',
-    items: [
-      { label: 'Login', href: '/login' },
-      { label: 'Register', href: '/register' },
-    ],
-  },
-  {
-    title: 'USER',
-    items: [
-      { label: 'Dashboard', href: '/dashboard' },
-      { label: 'Upgrade Role', href: '/upgrade' },
-    ],
-  },
-  {
-    title: 'ADMIN',
-    items: [
-      { label: 'God-Mode', href: '/god-mode' },
-      { label: 'Users', href: '/god-mode/users' },
-      { label: 'Add API', href: '/god-mode/apis' },
-    ],
-  },
-];
+  });
 
-export default function Sidebar({ isOpen, onClose }) {
-  const pathname = usePathname();
+  // Jika belum login, tampilkan AUTH
+  if (!session) {
+    menuGroups.push({
+      title: 'AUTH',
+      items: [
+        { label: 'Login', href: '/login' },
+        { label: 'Register', href: '/register' },
+      ],
+    });
+  }
+
+  // Jika sudah login, tampilkan USER
+  if (session) {
+    menuGroups.push({
+      title: 'USER',
+      items: [
+        { label: 'Dashboard', href: '/dashboard' },
+        { label: 'Upgrade Role', href: '/upgrade' },
+      ],
+    });
+  }
+
+  // Jika role Developer atau Admin, tampilkan ADMIN
+  if (session && (userRole === 'Developer' || userRole === 'Admin')) {
+    menuGroups.push({
+      title: 'ADMIN',
+      items: [
+        { label: 'God-Mode', href: '/god-mode' },
+        { label: 'Users', href: '/god-mode/users' },
+        { label: 'Add API', href: '/god-mode/apis' },
+      ],
+    });
+  }
 
   return (
     <>
