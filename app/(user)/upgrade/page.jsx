@@ -6,12 +6,11 @@ import { supabase } from '@/lib/supabase';
 export default function UpgradePage() {
   const [role, setRole] = useState('VIP');
   const [username, setUsername] = useState('');
-  const [file, setFile] = useState(null); // tetap ada UI, tidak dikirim ke DB
+  const [file, setFile] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Ambil session user
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -34,14 +33,14 @@ export default function UpgradePage() {
       return;
     }
 
-    // Insert ke tabel upgrade_requests (abaikan file)
+    // 1. Insert ke database
     const { error } = await supabase
       .from('upgrade_requests')
       .insert([
         {
           user_id: userId,
           requested_role: role,
-          discord_notes: username, // username Discord sebagai catatan
+          discord_notes: username,
         },
       ]);
 
@@ -50,6 +49,23 @@ export default function UpgradePage() {
       return;
     }
 
+    // 2. Panggil webhook internal untuk notifikasi Discord
+    try {
+      await fetch('/api/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username,
+          roleTujuan: role,
+          catatan: username,
+        }),
+      });
+    } catch (webhookError) {
+      console.error('Gagal memanggil webhook:', webhookError);
+      // Tidak perlu menghentikan alur utama
+    }
+
+    // 3. Tampilkan pesan sukses
     setSubmitted(true);
   };
 
