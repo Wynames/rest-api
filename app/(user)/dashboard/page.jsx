@@ -8,10 +8,11 @@ export default function DashboardPage() {
   const router = useRouter();
   const [userData, setUserData] = useState(null);
   const [apiKey, setApiKey] = useState('');
+  const [customKeyInput, setCustomKeyInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(''); // 'success' | 'error' | ''
 
-  // Map role ke maksimum limit harian
   const getMaxLimit = (role) => {
     switch (role) {
       case 'Free': return 60;
@@ -19,13 +20,12 @@ export default function DashboardPage() {
       case 'Lord': return 1500;
       case "King's": return 5000;
       case 'Developer': return 999999999;
-      default: return 60; // fallback aman
+      default: return 60;
     }
   };
 
   useEffect(() => {
     const loadDashboard = async () => {
-      // 1. Cek session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.push('/login');
@@ -34,7 +34,6 @@ export default function DashboardPage() {
 
       const userId = session.user.id;
 
-      // 2. Ambil data user dari tabel public.users
       const { data: userRow, error: userError } = await supabase
         .from('users')
         .select('username, role, limit_harian')
@@ -43,20 +42,11 @@ export default function DashboardPage() {
 
       if (userError || !userRow) {
         console.error('Gagal mengambil data user:', userError?.message);
-        setUserData({
-          username: session.user.email,
-          role: 'Free',
-          limitHarian: 0,
-        });
+        setUserData({ username: session.user.email, role: 'Free', limitHarian: 0 });
       } else {
-        setUserData({
-          username: userRow.username,
-          role: userRow.role,
-          limitHarian: userRow.limit_harian,
-        });
+        setUserData({ username: userRow.username, role: userRow.role, limitHarian: userRow.limit_harian });
       }
 
-      // 3. Ambil atau buat API key
       const { data: existingKeys, error: keyError } = await supabase
         .from('api_keys')
         .select('api_key')
@@ -67,6 +57,7 @@ export default function DashboardPage() {
         console.error('Gagal mengambil API key:', keyError.message);
       } else if (existingKeys && existingKeys.length > 0) {
         setApiKey(existingKeys[0].api_key);
+        setCustomKeyInput(existingKeys[0].api_key); // isi input dengan key saat ini
       } else {
         const newApiKey = `XT4-${userId.substring(0, 8)}-${Date.now().toString(36)}`;
         const { error: insertError } = await supabase
@@ -75,6 +66,7 @@ export default function DashboardPage() {
 
         if (!insertError) {
           setApiKey(newApiKey);
+          setCustomKeyInput(newApiKey);
         } else {
           console.error('Gagal membuat API key:', insertError.message);
         }
@@ -92,6 +84,31 @@ export default function DashboardPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleSaveCustomKey = async () => {
+    if (!userData || !customKeyInput.trim()) return;
+    setSaveStatus('');
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from('api_keys')
+      .update({ api_key: customKeyInput.trim(), is_custom: true })
+      .eq('user_id', userId);
+
+    if (error) {
+      setSaveStatus('error');
+      console.error('Gagal menyimpan API key:', error.message);
+    } else {
+      setApiKey(customKeyInput.trim());
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus(''), 3000);
+    }
+  };
+
+  const canCustomize = userData && userData.role !== 'Free';
 
   if (loading) {
     return (
@@ -162,6 +179,44 @@ export default function DashboardPage() {
             ? 'Developer tidak memiliki batasan limit.'
             : 'Limit mereset setiap awal hari. Upgrade ke VIP untuk limit lebih besar.'}
         </p>
+      </div>
+
+      {/* Custom API Key Section */}
+      <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
+        <h2 className="text-white font-semibold mb-3">Custom API Key</h2>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="text"
+            value={customKeyInput}
+            onChange={(e) => setCustomKeyInput(e.target.value)}
+            disabled={!canCustomize}
+            placeholder={canCustomize ? 'Masukkan API Key kustom' : 'Hanya untuk VIP ke atas'}
+            className={`flex-1 px-4 py-3 bg-black border border-[#333333] rounded-lg text-white placeholder-gray-600 outline-none focus:border-white focus:ring-1 focus:ring-white ${
+              !canCustomize ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          />
+          <button
+            onClick={handleSaveCustomKey}
+            disabled={!canCustomize}
+            className="px-6 py-3 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Simpan Key Baru
+          </button>
+        </div>
+        {!canCustomize && (
+          <p className="text-gray-500 text-xs mt-2">Upgrade ke VIP untuk Custom API Key.</p>
+        )}
+        {saveStatus === 'success' && (
+          <div className="mt-3 text-green-400 text-sm flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            API Key berhasil diperbarui!
+          </div>
+        )}
+        {saveStatus === 'error' && (
+          <div className="mt-3 text-red-400 text-sm">Gagal menyimpan API Key. Silakan coba lagi.</div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-4">
