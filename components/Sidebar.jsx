@@ -16,7 +16,6 @@ export default function Sidebar({ isOpen, onClose }) {
       setSession(session);
 
       if (session?.user) {
-        // Ambil role dari tabel users
         const { data: userData, error } = await supabase
           .from('users')
           .select('role')
@@ -33,7 +32,6 @@ export default function Sidebar({ isOpen, onClose }) {
 
     checkUser();
 
-    // Listen perubahan auth state
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session) setUserRole(null);
@@ -44,10 +42,8 @@ export default function Sidebar({ isOpen, onClose }) {
     };
   }, []);
 
-  // Grup menu dinamis
   const menuGroups = [];
 
-  // PUBLIC selalu ada
   menuGroups.push({
     title: 'PUBLIC',
     items: [
@@ -57,7 +53,6 @@ export default function Sidebar({ isOpen, onClose }) {
     ],
   });
 
-  // Jika belum login, tampilkan AUTH
   if (!session) {
     menuGroups.push({
       title: 'AUTH',
@@ -68,7 +63,6 @@ export default function Sidebar({ isOpen, onClose }) {
     });
   }
 
-  // Jika sudah login, tampilkan USER
   if (session) {
     menuGroups.push({
       title: 'USER',
@@ -79,7 +73,6 @@ export default function Sidebar({ isOpen, onClose }) {
     });
   }
 
-  // Jika role Developer atau Admin, tampilkan ADMIN
   if (session && (userRole === 'Developer' || userRole === 'Admin')) {
     menuGroups.push({
       title: 'ADMIN',
@@ -93,7 +86,6 @@ export default function Sidebar({ isOpen, onClose }) {
 
   return (
     <>
-      {/* Overlay (mobile) */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
@@ -103,14 +95,14 @@ export default function Sidebar({ isOpen, onClose }) {
 
       <aside
         className={`
-          fixed top-0 left-0 z-50 h-full w-64 
+          fixed top-0 left-0 z-50 h-screen w-64 
           bg-rich-black border-r border-border-dark
           transform transition-transform duration-300 ease-in-out
-          lg:translate-x-0 lg:static lg:z-auto
+          lg:translate-x-0 lg:sticky lg:top-0 lg:z-auto
+          overflow-y-auto
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        {/* Header + tombol close mobile */}
         <div className="flex items-center justify-between h-16 px-5 border-b border-border-dark">
           <Link href="/" className="text-xl font-bold tracking-tight text-pure-white">
             XT4 API
@@ -126,8 +118,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Grup menu */}
-        <nav className="mt-6 px-3 space-y-6 overflow-y-auto">
+        <nav className="mt-6 px-3 space-y-6">
           {menuGroups.map((group) => (
             <div key={group.title}>
               <p className="px-4 mb-2 text-xs font-semibold text-gray-500 tracking-wider">
