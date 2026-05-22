@@ -9,9 +9,11 @@ export default function Sidebar({ isOpen, onClose }) {
   const pathname = usePathname();
   const [session, setSession] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [loadingRole, setLoadingRole] = useState(true); // state untuk mencegah flicker
 
   useEffect(() => {
     const checkUser = async () => {
+      setLoadingRole(true);
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
 
@@ -24,17 +26,34 @@ export default function Sidebar({ isOpen, onClose }) {
 
         if (!error && userData) {
           setUserRole(userData.role);
+        } else {
+          setUserRole(null);
         }
       } else {
         setUserRole(null);
       }
+      setLoadingRole(false);
     };
 
     checkUser();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (!session) setUserRole(null);
+      if (!session) {
+        setUserRole(null);
+        setLoadingRole(false);
+      } else {
+        // ambil ulang role
+        supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: userData, error }) => {
+            setUserRole(error ? null : userData?.role);
+            setLoadingRole(false);
+          });
+      }
     });
 
     return () => {
@@ -73,7 +92,8 @@ export default function Sidebar({ isOpen, onClose }) {
     });
   }
 
-  if (session && (userRole === 'Developer' || userRole === 'Admin')) {
+  // Menampilkan ADMIN jika role yang diperoleh adalah 'admin' (lowercase) atau 'Developer' (sesuaikan data)
+  if (session && !loadingRole && (userRole === 'admin' || userRole === 'Developer')) {
     menuGroups.push({
       title: 'ADMIN',
       items: [
