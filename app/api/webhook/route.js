@@ -1,53 +1,55 @@
 // app/api/webhook/route.js
 import { NextResponse } from 'next/server';
 
-/**
- * POST /api/webhook
- * Endpoint simulasi untuk menerima bukti transfer upgrade.
- * Menerima body JSON: { username, roleTujuan, catatan }
- */
 export async function POST(request) {
   try {
-    // Baca body dari request
     const body = await request.json();
-
     const { username, roleTujuan, catatan } = body;
 
-    // Validasi sederhana: pastikan data penting ada
     if (!username || !roleTujuan) {
       return NextResponse.json(
-        {
-          success: false,
-          message: 'Data tidak lengkap. Pastikan username dan roleTujuan dikirim.',
-        },
+        { success: false, message: 'Data tidak lengkap. Pastikan username dan roleTujuan dikirim.' },
         { status: 400 }
       );
     }
 
-    // Di sini nanti akan dikirim ke Discord webhook menggunakan fetch
-    // atau disimpan ke Supabase untuk diproses admin.
-    // Untuk saat ini, kita hanya mengembalikan success.
+    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
-    console.log('Webhook received:', { username, roleTujuan, catatan });
+    if (!webhookUrl) {
+      console.error('DISCORD_WEBHOOK_URL tidak disetel di environment.');
+      return NextResponse.json(
+        { success: false, message: 'Konfigurasi webhook tidak ditemukan.' },
+        { status: 500 }
+      );
+    }
+
+    // Kirim ke Discord
+    const discordPayload = {
+      content: `📩 **Request Upgrade Baru**\n👤 Username: **${username}**\n🎯 Role Tujuan: **${roleTujuan}**\n📝 Catatan: ${catatan || '-'}`,
+    };
+
+    const discordResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(discordPayload),
+    });
+
+    if (!discordResponse.ok) {
+      console.error('Gagal mengirim webhook ke Discord:', discordResponse.status);
+      return NextResponse.json(
+        { success: false, message: 'Gagal mengirim notifikasi ke Discord.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
-      {
-        success: true,
-        message: 'Notifikasi otomatis berhasil dikirim ke Webhook Discord Admin!',
-        data: {
-          username,
-          roleTujuan,
-          catatan,
-        },
-      },
+      { success: true, message: 'Notifikasi berhasil dikirim ke Discord.' },
       { status: 200 }
     );
   } catch (error) {
+    console.error('Webhook error:', error);
     return NextResponse.json(
-      {
-        success: false,
-        message: 'Terjadi kesalahan saat memproses request.',
-      },
+      { success: false, message: 'Terjadi kesalahan server.' },
       { status: 500 }
     );
   }
