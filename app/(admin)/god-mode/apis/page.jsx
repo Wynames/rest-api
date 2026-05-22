@@ -10,6 +10,7 @@ export default function GodModeApisPage() {
     path: '/api/...',
     method: 'GET',
     responseExample: '',
+    params: '', // string JSON
   });
   const [showAlert, setShowAlert] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,18 @@ export default function GodModeApisPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Insert ke tabel api_endpoints
+    // Parsing params JSON jika diisi
+    let parsedParams = null;
+    if (formData.params.trim()) {
+      try {
+        parsedParams = JSON.parse(formData.params);
+      } catch (err) {
+        alert('Format JSON pada Parameter tidak valid.');
+        setLoading(false);
+        return;
+      }
+    }
+
     const { error } = await supabase.from('api_endpoints').insert([
       {
         name: formData.name,
@@ -33,6 +45,7 @@ export default function GodModeApisPage() {
         path: formData.path,
         method: formData.method,
         response_example: formData.responseExample,
+        params: parsedParams, // bisa null atau array objek
         is_active: true,
       },
     ]);
@@ -43,7 +56,7 @@ export default function GodModeApisPage() {
       return;
     }
 
-    // Sukses: tampilkan alert, reset form
+    // Sukses
     setShowAlert(true);
     setFormData({
       name: '',
@@ -51,6 +64,7 @@ export default function GodModeApisPage() {
       path: '/api/...',
       method: 'GET',
       responseExample: '',
+      params: '',
     });
     setLoading(false);
 
@@ -151,6 +165,25 @@ export default function GodModeApisPage() {
             <option value="GET">GET</option>
             <option value="POST">POST</option>
           </select>
+        </div>
+
+        {/* Parameter JSON (Opsional) */}
+        <div>
+          <label htmlFor="params" className="block text-sm font-medium text-text-secondary mb-1.5">
+            Parameter JSON (Opsional)
+          </label>
+          <textarea
+            id="params"
+            name="params"
+            value={formData.params}
+            onChange={handleChange}
+            rows={4}
+            placeholder='[{"name":"gender","type":"string","description":"...","required":true,"example":"cowo"}]'
+            className="w-full rounded-lg border border-border-dark bg-pure-black px-4 py-3 text-pure-white placeholder-gray-600 outline-none transition-colors focus:border-pure-white focus:ring-1 focus:ring-pure-white font-mono text-sm"
+          />
+          <p className="text-gray-500 text-xs mt-1">
+            Isi dengan array JSON yang berisi objek parameter (name, type, description, required, example). Kosongkan jika tidak ada.
+          </p>
         </div>
 
         {/* Contoh Response JSON */}
