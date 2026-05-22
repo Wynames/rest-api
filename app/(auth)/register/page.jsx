@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import ReCAPTCHA from 'react-google-recaptcha';
 import { supabase } from '@/lib/supabase';
 
 export default function RegisterPage() {
@@ -14,6 +15,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -26,7 +28,6 @@ export default function RegisterPage() {
 
     const { username, email, password, confirmPassword } = formData;
 
-    // Validasi sisi klien
     if (password !== confirmPassword) {
       setError('Password dan konfirmasi password tidak cocok.');
       return;
@@ -37,14 +38,19 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!captchaToken) {
+      setError('Harap selesaikan Captcha terlebih dahulu!');
+      return;
+    }
+
     setLoading(true);
 
-    // 1. Daftar melalui Supabase Auth
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { username },
+        captchaToken, // Kirim token reCAPTCHA ke Supabase
       },
     });
 
@@ -54,158 +60,90 @@ export default function RegisterPage() {
       return;
     }
 
-    // 2. Cek jika user sudah terdaftar (identities kosong)
     if (data.user && data.user.identities && data.user.identities.length === 0) {
       setError('Email sudah terdaftar. Silakan gunakan email lain atau login.');
       setLoading(false);
       return;
     }
 
-    // 3. Insert / upsert data ke tabel public.users
     const userId = data.user.id;
     const { error: insertError } = await supabase
       .from('users')
-      .upsert(
-        [
-          {
-            id: userId,
-            username: username,
-            email: email,
-          },
-        ],
-        { onConflict: 'id' }
-      );
+      .upsert([{ id: userId, username, email }], { onConflict: 'id' });
 
     if (insertError) {
       console.error('Gagal menyimpan data user:', insertError.message);
-      // Tetap lanjut karena auth sudah berhasil
     }
 
-    // Berhasil
-    setSuccess(
-      'Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi akun (jika diperlukan).'
-    );
+    setSuccess('Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi akun (jika diperlukan).');
     setLoading(false);
 
-    // Reset form
-    setFormData({
-      username: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-    });
+    setFormData({ username: '', email: '', password: '', confirmPassword: '' });
+    setCaptchaToken(null); // reset captcha
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black px-4">
-      {/* Card Register */}
       <div className="w-full max-w-md rounded-xl border border-[#333333] bg-[#111111] p-8 shadow-2xl">
-        {/* Judul */}
         <h1 className="text-2xl font-bold text-white mb-1">Daftar Akun Baru</h1>
         <p className="text-gray-400 text-sm mb-8">
           Isi data di bawah untuk membuat akun XT4 API.
         </p>
 
-        {/* Notifikasi Error */}
         {error && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-900/20 p-3 text-sm text-red-300">
             {error}
           </div>
         )}
-
-        {/* Notifikasi Sukses */}
         {success && (
           <div className="mb-4 rounded-lg border border-green-500/30 bg-green-900/20 p-3 text-sm text-green-300">
             {success}
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Username */}
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1.5">
-              Username
-            </label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              required
-              placeholder="johndoe"
-              value={formData.username}
-              onChange={handleChange}
-              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none transition-colors focus:border-white focus:ring-1 focus:ring-white"
+            <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1.5">Username</label>
+            <input id="username" name="username" type="text" required placeholder="johndoe" value={formData.username} onChange={handleChange}
+              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none focus:border-white focus:ring-1 focus:ring-white" />
+          </div>
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
+            <input id="email" name="email" type="email" required placeholder="john@example.com" value={formData.email} onChange={handleChange}
+              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none focus:border-white focus:ring-1 focus:ring-white" />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
+            <input id="password" name="password" type="password" required placeholder="••••••••" value={formData.password} onChange={handleChange}
+              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none focus:border-white focus:ring-1 focus:ring-white" />
+          </div>
+
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1.5">Konfirmasi Password</label>
+            <input id="confirmPassword" name="confirmPassword" type="password" required placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange}
+              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none focus:border-white focus:ring-1 focus:ring-white" />
+          </div>
+
+          {/* reCAPTCHA */}
+          <div className="flex justify-center">
+            <ReCAPTCHA
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+              onChange={(token) => setCaptchaToken(token)}
+              theme="dark"
             />
           </div>
 
-          {/* Email */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              placeholder="john@example.com"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none transition-colors focus:border-white focus:ring-1 focus:ring-white"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1.5">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              placeholder="••••••••"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none transition-colors focus:border-white focus:ring-1 focus:ring-white"
-            />
-          </div>
-
-          {/* Konfirmasi Password */}
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1.5">
-              Konfirmasi Password
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              required
-              placeholder="••••••••"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              className="w-full rounded-lg border border-[#333333] bg-black px-4 py-3 text-white placeholder-gray-600 outline-none transition-colors focus:border-white focus:ring-1 focus:ring-white"
-            />
-          </div>
-
-          {/* Tombol Daftar */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <button type="submit" disabled={loading}
+            className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed">
             {loading ? 'Memproses...' : 'Daftar Akun'}
           </button>
         </form>
 
-        {/* Tautan ke Login */}
         <p className="mt-6 text-center text-sm text-gray-400">
           Sudah punya akun?{' '}
-          <Link href="/login" className="font-medium text-white hover:underline">
-            Login di sini
-          </Link>
+          <Link href="/login" className="font-medium text-white hover:underline">Login di sini</Link>
         </p>
       </div>
     </div>
