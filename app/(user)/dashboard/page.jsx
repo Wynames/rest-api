@@ -11,6 +11,18 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  // Map role ke maksimum limit harian
+  const getMaxLimit = (role) => {
+    switch (role) {
+      case 'Free': return 60;
+      case 'VIP': return 500;
+      case 'Lord': return 1500;
+      case "King's": return 5000;
+      case 'Developer': return 999999999;
+      default: return 60; // fallback aman
+    }
+  };
+
   useEffect(() => {
     const loadDashboard = async () => {
       // 1. Cek session
@@ -31,7 +43,6 @@ export default function DashboardPage() {
 
       if (userError || !userRow) {
         console.error('Gagal mengambil data user:', userError?.message);
-        // fallback jika ada masalah
         setUserData({
           username: session.user.email,
           role: 'Free',
@@ -55,10 +66,8 @@ export default function DashboardPage() {
       if (keyError) {
         console.error('Gagal mengambil API key:', keyError.message);
       } else if (existingKeys && existingKeys.length > 0) {
-        // API key sudah ada
         setApiKey(existingKeys[0].api_key);
       } else {
-        // Belum ada → buatkan otomatis dengan format unik
         const newApiKey = `XT4-${userId.substring(0, 8)}-${Date.now().toString(36)}`;
         const { error: insertError } = await supabase
           .from('api_keys')
@@ -100,8 +109,7 @@ export default function DashboardPage() {
     );
   }
 
-  // Hitung persentase limit (maks 1000 request untuk user biasa, sesuaikan nanti)
-  const maxLimit = 1000; // bisa disesuaikan per role
+  const maxLimit = getMaxLimit(userData.role);
   const limitPercentage = Math.min((userData.limitHarian / maxLimit) * 100, 100);
 
   return (
@@ -110,26 +118,23 @@ export default function DashboardPage() {
 
       {/* Kartu Informasi Pengguna */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Username */}
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Username</p>
           <p className="text-white text-xl font-semibold mt-1">{userData.username}</p>
         </div>
 
-        {/* Role */}
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Role</p>
           <p className="text-white text-xl font-semibold mt-1 flex items-center gap-2">
             {userData.role}
-            {userData.role === 'VIP' && (
+            {userData.role !== 'Free' && (
               <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white">
-                ⭐ VIP
+                {userData.role === 'VIP' ? '⭐ VIP' : userData.role === 'Lord' ? '👑 Lord' : userData.role === "King's" ? '🤴 King\'s' : '⚡ Dev'}
               </span>
             )}
           </p>
         </div>
 
-        {/* API Key */}
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">API Key</p>
           <p className="text-white text-sm font-mono mt-1 break-all">
@@ -146,7 +151,6 @@ export default function DashboardPage() {
             {userData.limitHarian} / {maxLimit}
           </p>
         </div>
-        {/* Progress bar */}
         <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-[#333333]">
           <div
             className="h-full bg-white rounded-full transition-all duration-500"
@@ -154,11 +158,12 @@ export default function DashboardPage() {
           />
         </div>
         <p className="text-gray-500 text-xs mt-2">
-          Limit mereset setiap awal hari. Upgrade ke VIP untuk limit lebih besar.
+          {userData.role === 'Developer'
+            ? 'Developer tidak memiliki batasan limit.'
+            : 'Limit mereset setiap awal hari. Upgrade ke VIP untuk limit lebih besar.'}
         </p>
       </div>
 
-      {/* Tombol Aksi */}
       <div className="flex flex-wrap gap-4">
         <button
           onClick={copyApiKey}
