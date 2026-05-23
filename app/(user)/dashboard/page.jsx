@@ -11,7 +11,8 @@ export default function DashboardPage() {
   const [customKeyInput, setCustomKeyInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(''); // 'success' | 'error' | ''
+  const [saveStatus, setSaveStatus] = useState('');
+  const [apiLogs, setApiLogs] = useState([]);
 
   const getMaxLimit = (role) => {
     switch (role) {
@@ -47,6 +48,7 @@ export default function DashboardPage() {
         setUserData({ username: userRow.username, role: userRow.role, limitHarian: userRow.limit_harian });
       }
 
+      // API key
       const { data: existingKeys, error: keyError } = await supabase
         .from('api_keys')
         .select('api_key')
@@ -57,7 +59,7 @@ export default function DashboardPage() {
         console.error('Gagal mengambil API key:', keyError.message);
       } else if (existingKeys && existingKeys.length > 0) {
         setApiKey(existingKeys[0].api_key);
-        setCustomKeyInput(existingKeys[0].api_key); // isi input dengan key saat ini
+        setCustomKeyInput(existingKeys[0].api_key);
       } else {
         const newApiKey = `XT4-${userId.substring(0, 8)}-${Date.now().toString(36)}`;
         const { error: insertError } = await supabase
@@ -70,6 +72,18 @@ export default function DashboardPage() {
         } else {
           console.error('Gagal membuat API key:', insertError.message);
         }
+      }
+
+      // Ambil 10 log terakhir
+      const { data: logs, error: logError } = await supabase
+        .from('api_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (!logError && logs) {
+        setApiLogs(logs);
       }
 
       setLoading(false);
@@ -216,6 +230,49 @@ export default function DashboardPage() {
         )}
         {saveStatus === 'error' && (
           <div className="mt-3 text-red-400 text-sm">Gagal menyimpan API Key. Silakan coba lagi.</div>
+        )}
+      </div>
+
+      {/* Riwayat Pemakaian API */}
+      <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
+        <h2 className="text-white font-semibold mb-4">Riwayat Pemakaian Terakhir</h2>
+        {apiLogs.length === 0 ? (
+          <p className="text-gray-500 text-sm">Belum ada aktivitas API.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-text-secondary border-b border-[#333333]">
+                <tr>
+                  <th className="pb-2 font-medium">Endpoint</th>
+                  <th className="pb-2 font-medium">Waktu</th>
+                  <th className="pb-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-300">
+                {apiLogs.map((log) => {
+                  const date = new Date(log.created_at);
+                  const timeStr = date.toLocaleDateString('id-ID', {
+                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                  });
+                  return (
+                    <tr key={log.id} className="border-b border-[#2a2a2a] last:border-0">
+                      <td className="py-2 text-white font-mono text-xs">{log.endpoint}</td>
+                      <td className="py-2 text-xs">{timeStr}</td>
+                      <td className="py-2">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          log.status_code >= 200 && log.status_code < 300
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {log.status_code}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
