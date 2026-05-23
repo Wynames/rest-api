@@ -131,14 +131,17 @@ export async function POST(request) {
     return NextResponse.json({ success: false, message: 'API Key tidak valid atau limit habis.' }, { status: 403 });
   }
 
-  // 4. Ambil domain dari body (opsional)
+  // 4. Ambil domain dari body (opsional) - aman dari body kosong
   let body = {};
   try {
     const contentLength = request.headers.get('content-length');
     if (contentLength && parseInt(contentLength) > 0) {
-      body = await request.json();
+      const text = await request.text();
+      if (text) body = JSON.parse(text);
     }
-  } catch {}
+  } catch {
+    // body tidak valid atau kosong, lanjut dengan default
+  }
 
   const domain = body?.domain || '';
 
