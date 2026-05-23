@@ -9,8 +9,13 @@ const supabaseAdmin = createClient(
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const gender = searchParams.get('gender')?.toLowerCase();
   const apikey = searchParams.get('apikey');
+
+  // Ambil gender dari 'gender' atau 'genre', sanitasi kutipan
+  let gender = searchParams.get('gender') || searchParams.get('genre');
+  if (gender) {
+    gender = gender.replace(/['"]/g, '').toLowerCase().trim();
+  }
 
   if (!apikey) {
     return NextResponse.json(
@@ -19,7 +24,6 @@ export async function GET(request) {
     );
   }
 
-  // Panggil RPC decrement_api_limit
   const { data: isSuccess, error: rpcError } = await supabaseAdmin.rpc(
     'decrement_api_limit',
     { api_key_input: apikey }
@@ -40,15 +44,13 @@ export async function GET(request) {
     );
   }
 
-  // Validasi gender
   if (!gender || (gender !== 'cowo' && gender !== 'cewe')) {
     return NextResponse.json(
       { success: false, message: 'Gender harus "cowo" atau "cewe".' },
-      { status: 400 }
+      { status: 400 } // sudah benar 400
     );
   }
 
-  // Ambil karakter dari database sesuai gender
   const { data: characters, error: dbError } = await supabaseAdmin
     .from('characters')
     .select('*')
@@ -69,7 +71,6 @@ export async function GET(request) {
     );
   }
 
-  // Pilih acak
   const randomIndex = Math.floor(Math.random() * characters.length);
   const character = characters[randomIndex];
 
