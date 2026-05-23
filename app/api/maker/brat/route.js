@@ -1,6 +1,7 @@
+// File: app/api/maker/brat/route.js
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createCanvas, registerFont } from 'canvas';
+import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
@@ -10,6 +11,18 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// ======================= DAFTAR FONT SEKALI =======================
+const FONT_PATH = path.join(process.cwd(), 'fonts', 'LiberationSans-Regular.ttf');
+let fontReady = false;
+if (fs.existsSync(FONT_PATH)) {
+  try {
+    GlobalFonts.registerFromPath(FONT_PATH, 'CustomFont');
+    fontReady = true;
+  } catch {
+    console.error('Gagal mendaftarkan font');
+  }
+}
 
 // ======================= BRAT GENERATOR =======================
 const SIZE = 1000;
@@ -33,19 +46,8 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 async function generateBratImage(text) {
-  // ===== PASTIKAN FONT ADA =====
-  const FONT_PATH = path.join(process.cwd(), 'fonts', 'LiberationSans-Regular.ttf');
-  if (!fs.existsSync(FONT_PATH)) {
-    throw new Error(`Font tidak ditemukan di ${FONT_PATH}. Pastikan file ada di folder fonts/.`);
-  }
-
-  // Daftarkan font (hanya sekali, tapi aman dipanggil lagi)
-  try {
-    registerFont(FONT_PATH, { family: 'CustomFont' });
-  } catch {
-    throw new Error('Gagal mendaftarkan font. Pastikan file LiberationSans-Regular.ttf valid.');
-  }
-
+  if (!fontReady) throw new Error('Font tidak tersedia. Letakkan LiberationSans-Regular.ttf di folder fonts/');
+  
   const canvas = createCanvas(SIZE, SIZE);
   const ctx = canvas.getContext('2d');
 
@@ -70,25 +72,21 @@ async function generateBratImage(text) {
     y += fontSize * 1.15;
   }
 
+  // @napi-rs/canvas bisa langsung encode PNG
   const pngBuffer = canvas.toBuffer('image/png');
   return await sharp(pngBuffer).webp({ quality: 92 }).toBuffer();
 }
 
-// ======================= API ROUTE HANDLER (GET) =======================
+// ======================= API ROUTE HANDLER =======================
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const apikey = searchParams.get('apikey');
   const text = (searchParams.get('text') || 'brat').trim();
 
-  // Validasi API Key
   if (!apikey) {
-    return NextResponse.json(
-      { success: false, message: 'API Key wajib disertakan (?apikey=...)' },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, message: 'API Key wajib' }, { status: 401 });
   }
 
-  // Ambil user_id
   const { data: keyData } = await supabaseAdmin
     .from('api_keys')
     .select('user_id')
@@ -99,39 +97,28 @@ export async function GET(request) {
   const insertLog = async (statusCode) => {
     if (!userId) return;
     await supabaseAdmin.from('api_logs').insert([
-      {
-        user_id: userId,
-        endpoint: '/api/maker/brat',
-        method: 'GET',
-        status_code: statusCode
-      }
+      { user_id: userId, endpoint: '/api/maker/brat', method: 'GET', status_code: statusCode }
     ]);
   };
 
-  // Decrement limit
-  const { data: isSuccess, error: rpcError } = await supabaseAdmin.rpc(
-    'decrement_api_limit',
-    { api_key_input: apikey }
-  );
-
+  const { data: isSuccess, error: rpcError } = await supabaseAdmin.rpc('decrement_api_limit', { api_key_input: apikey });
   if (rpcError) {
     await insertLog(500);
-    return NextResponse.json({ success: false, message: 'Terjadi kesalahan internal.' }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 });
   }
   if (!isSuccess) {
     await insertLog(403);
-    return NextResponse.json({ success: false, message: 'API Key tidak valid atau limit habis.' }, { status: 403 });
+    return NextResponse.json({ success: false, message: 'Invalid / limit habis' }, { status: 403 });
   }
 
   if (text.length > 200) {
     await insertLog(400);
-    return NextResponse.json({ success: false, message: 'Teks maksimal 200 karakter.' }, { status: 400 });
+    return NextResponse.json({ success: false, message: 'Teks maks 200 karakter' }, { status: 400 });
   }
 
   try {
     const webpBuffer = await generateBratImage(text);
     await insertLog(200);
-
     return new NextResponse(webpBuffer, {
       status: 200,
       headers: {
@@ -140,11 +127,8 @@ export async function GET(request) {
       }
     });
   } catch (err) {
-    console.error('Brat generator error:', err.message);
+    console.error('Brat error:', err.message);
     await insertLog(500);
-    return NextResponse.json(
-      { success: false, message: `Gagal membuat gambar: ${err.message}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: 'Gagal: ' + err.message }, { status: 500 });
   }
 }
