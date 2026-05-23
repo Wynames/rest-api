@@ -57,7 +57,28 @@ export async function GET(request) {
         );
     }
 
-    // 2. Validasi & kurangi limit API key
+    // 2. Ambil user_id SEKALI untuk semua log
+    const { data: keyData } = await supabaseAdmin
+        .from('api_keys')
+        .select('user_id')
+        .eq('api_key', apikey)
+        .maybeSingle();
+    const userId = keyData?.user_id || null;
+
+    // Helper function DRY untuk insert log
+    const insertLog = async (statusCode) => {
+        if (!userId) return; // tidak ada user_id, skip log
+        await supabaseAdmin.from('api_logs').insert([
+            {
+                user_id: userId,
+                endpoint: '/api/nekopoi/search',
+                method: 'GET',
+                status_code: statusCode
+            }
+        ]);
+    };
+
+    // 3. Validasi & kurangi limit API key
     const { data: isSuccess, error: rpcError } = await supabaseAdmin.rpc(
         'decrement_api_limit',
         { api_key_input: apikey }
@@ -65,21 +86,7 @@ export async function GET(request) {
 
     if (rpcError) {
         console.error('RPC error:', rpcError.message);
-        const { data: keyData } = await supabaseAdmin
-            .from('api_keys')
-            .select('user_id')
-            .eq('api_key', apikey)
-            .maybeSingle();
-        if (keyData?.user_id) {
-            await supabaseAdmin.from('api_logs').insert([
-                {
-                    user_id: keyData.user_id,
-                    endpoint: '/api/nekopoi/search',
-                    method: 'GET',
-                    status_code: 500
-                }
-            ]);
-        }
+        await insertLog(500);
         return NextResponse.json(
             { success: false, message: 'Terjadi kesalahan internal.' },
             { status: 500 }
@@ -87,82 +94,34 @@ export async function GET(request) {
     }
 
     if (!isSuccess) {
-        const { data: keyData } = await supabaseAdmin
-            .from('api_keys')
-            .select('user_id')
-            .eq('api_key', apikey)
-            .maybeSingle();
-        if (keyData?.user_id) {
-            await supabaseAdmin.from('api_logs').insert([
-                {
-                    user_id: keyData.user_id,
-                    endpoint: '/api/nekopoi/search',
-                    method: 'GET',
-                    status_code: 403
-                }
-            ]);
-        }
+        await insertLog(403);
         return NextResponse.json(
             { success: false, message: 'API Key tidak valid atau Limit harian Anda habis. Silakan upgrade!' },
             { status: 403 }
         );
     }
 
-    // Ambil user_id untuk logging selanjutnya
-    const { data: keyData } = await supabaseAdmin
-        .from('api_keys')
-        .select('user_id')
-        .eq('api_key', apikey)
-        .maybeSingle();
-
-    // 3. Validasi parameter pencarian
+    // 4. Validasi parameter pencarian
     if (!keyword || keyword.trim() === '') {
-        if (keyData?.user_id) {
-            await supabaseAdmin.from('api_logs').insert([
-                {
-                    user_id: keyData.user_id,
-                    endpoint: '/api/nekopoi/search',
-                    method: 'GET',
-                    status_code: 400
-                }
-            ]);
-        }
+        await insertLog(400);
         return NextResponse.json(
             { success: false, message: 'Parameter pencarian (q atau keyword) diperlukan dan tidak boleh kosong.' },
             { status: 400 }
         );
     }
 
-    // 4. Lakukan pencarian
+    // 5. Lakukan pencarian
     const client = new NekopoiClient();
     try {
         const data = await client.find(keyword.trim());
-        if (keyData?.user_id) {
-            await supabaseAdmin.from('api_logs').insert([
-                {
-                    user_id: keyData.user_id,
-                    endpoint: '/api/nekopoi/search',
-                    method: 'GET',
-                    status_code: 200
-                }
-            ]);
-        }
+        await insertLog(200);
         return NextResponse.json(
             { success: true, data },
             { status: 200 }
         );
     } catch (err) {
         console.error('Search error:', err.message);
-        if (keyData?.user_id) {
-            await supabaseAdmin.from('api_logs').insert([
-                {
-                    user_id: keyData.user_id,
-                    endpoint: '/api/nekopoi/search',
-                    method: 'GET',
-                    status_code: 500
-                }
-            ]);
-        }
+        await insertLog(500);
         return NextResponse.json(
             { success: false, message: err.message || 'Gagal melakukan pencarian.' },
             { status: 500 }
