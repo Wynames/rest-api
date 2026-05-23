@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { username, roleTujuan, catatan } = body;
+    const { username, roleTujuan, catatan, proofUrl } = body;
 
     if (!username || !roleTujuan) {
       return NextResponse.json(
@@ -23,9 +23,19 @@ export async function POST(request) {
       );
     }
 
-    // Kirim ke Discord
+    // Susun payload Discord dengan embed
     const discordPayload = {
-      content: `📩 **Request Upgrade Baru**\n👤 Username: **${username}**\n🎯 Role Tujuan: **${roleTujuan}**\n📝 Catatan: ${catatan || '-'}`,
+      embeds: [
+        {
+          title: '🚀 Request Upgrade Baru!',
+          color: 3447003, // biru
+          fields: [
+            { name: 'Username / Notes', value: catatan || 'Tidak ada', inline: true },
+            { name: 'Role Tujuan', value: roleTujuan || 'Unknown', inline: true },
+          ],
+          image: proofUrl ? { url: proofUrl } : undefined,
+        },
+      ],
     };
 
     const discordResponse = await fetch(webhookUrl, {
