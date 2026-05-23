@@ -33,14 +33,37 @@ export default function UpgradePage() {
       return;
     }
 
-    // 1. Insert ke database
+    let proofUrl = null;
+
+    // Upload file ke Supabase Storage jika ada
+    if (file) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('bukti_transfer')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        alert('Gagal mengunggah bukti: ' + uploadError.message);
+        return;
+      }
+
+      // Dapatkan URL publik
+      const { data: publicUrlData } = supabase.storage
+        .from('bukti_transfer')
+        .getPublicUrl(fileName);
+
+      proofUrl = publicUrlData.publicUrl;
+    }
+
+    // Insert ke database (sertakan proof_url jika ada)
     const { error } = await supabase
       .from('upgrade_requests')
       .insert([
         {
           user_id: userId,
           requested_role: role,
-          discord_notes: username,
+          discord_notes: proofUrl ? `Bukti: ${proofUrl} | ${username}` : username,
         },
       ]);
 
@@ -49,7 +72,7 @@ export default function UpgradePage() {
       return;
     }
 
-    // 2. Panggil webhook internal untuk notifikasi Discord
+    // Panggil webhook internal
     try {
       await fetch('/api/webhook', {
         method: 'POST',
@@ -62,10 +85,8 @@ export default function UpgradePage() {
       });
     } catch (webhookError) {
       console.error('Gagal memanggil webhook:', webhookError);
-      // Tidak perlu menghentikan alur utama
     }
 
-    // 3. Tampilkan pesan sukses
     setSubmitted(true);
   };
 
@@ -129,7 +150,7 @@ export default function UpgradePage() {
             />
           </div>
 
-          {/* Upload Bukti (hanya UI) */}
+          {/* Upload Bukti (sekarang berfungsi penuh) */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Upload Bukti Transfer (Screenshot)
