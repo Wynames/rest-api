@@ -20,7 +20,7 @@
     "cheerio": "^1.0.0",
     "canvas": "^2.11.2",
     "sharp": "^0.33.2",
-    "@napi-rs/canvas"
+    "@napi-rs/canvas": "^0.1.53"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",
