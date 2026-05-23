@@ -21,19 +21,24 @@ export default function GodModePage() {
       .from('users')
       .select('*', { count: 'exact', head: true });
 
-    // Request upgrade yang masih Menunggu, join dengan users untuk username dan email
+    // Ambil SEMUA request upgrade (tanpa filter status) untuk debugging
     const { data: upgrades, error: upgradeError } = await supabase
       .from('upgrade_requests')
       .select('*, users(username, email)')
-      .eq('status', 'Menunggu')
       .order('created_at', { ascending: false });
+
+    if (upgradeError) {
+      console.error("Error Fetch Upgrades:", upgradeError);
+    }
 
     if (!countError) {
       setStats((prev) => ({ ...prev, totalUser: totalUser ?? 0 }));
     }
     if (!upgradeError && upgrades) {
       setPendingUpgrades(upgrades);
-      setStats((prev) => ({ ...prev, pendingUpgrade: upgrades.length }));
+      // Hitung yang masih 'Menunggu' untuk statistik
+      const pendingCount = upgrades.filter((item) => item.status === 'Menunggu').length;
+      setStats((prev) => ({ ...prev, pendingUpgrade: pendingCount }));
     }
 
     setLoading(false);
@@ -94,9 +99,9 @@ export default function GodModePage() {
 
       {/* Tabel Daftar Request Upgrade */}
       <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Daftar Request Upgrade Tertunda</h2>
+        <h2 className="text-xl font-semibold text-white mb-4">Daftar Request Upgrade</h2>
         {pendingUpgrades.length === 0 ? (
-          <p className="text-gray-500">Tidak ada request upgrade tertunda.</p>
+          <p className="text-gray-500">Tidak ada request upgrade.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -120,17 +125,27 @@ export default function GodModePage() {
                     <td className="py-3">{item.discord_notes || '-'}</td>
                     <td className="py-3">{item.requested_role}</td>
                     <td className="py-3">
-                      <span className="bg-yellow-500/20 text-yellow-400 text-xs font-medium px-2 py-1 rounded-full">
+                      <span
+                        className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          item.status === 'Menunggu'
+                            ? 'bg-yellow-500/20 text-yellow-400'
+                            : item.status === 'Approved'
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
                         {item.status}
                       </span>
                     </td>
                     <td className="py-3">
-                      <button
-                        onClick={() => handleApprove(item.id, item.user_id, item.requested_role)}
-                        className="text-white hover:underline text-xs font-medium bg-green-600/20 text-green-400 px-3 py-1 rounded-full hover:bg-green-600/30 transition-colors"
-                      >
-                        Proses
-                      </button>
+                      {item.status === 'Menunggu' && (
+                        <button
+                          onClick={() => handleApprove(item.id, item.user_id, item.requested_role)}
+                          className="text-white hover:underline text-xs font-medium bg-green-600/20 text-green-400 px-3 py-1 rounded-full hover:bg-green-600/30 transition-colors"
+                        >
+                          Proses
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
