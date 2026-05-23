@@ -164,6 +164,7 @@ export default function GodModeApisPage() {
             <option value="Fun">Fun</option>
             <option value="AI">AI</option>
             <option value="Tools">Tools</option>
+            <option value="Nekopoi">Nekopoi</option>
           </select>
         </div>
 
