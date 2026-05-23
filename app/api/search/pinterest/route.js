@@ -23,7 +23,10 @@ function ts() {
   return Date.now();
 }
 
-async function pinterestSearch(q, n = 25) {
+async function pinterestSearch(q, requestedLimit = 25) {
+  // Pastikan limit adalah integer valid, antara 1-100
+  const limit = Math.min(Math.max(parseInt(requestedLimit, 10) || 25, 1), 100);
+
   const trace = traceId();
   const span = spanId();
 
@@ -45,7 +48,7 @@ async function pinterestSearch(q, n = 25) {
         static_feed: false,
         selected_one_bar_modules: null,
         query_pin_sigs: null,
-        page_size: n,
+        page_size: limit,           // kirim limit asli ke Pinterest
         price_max: null,
         price_min: null,
         query_image_pins: null,
@@ -99,7 +102,8 @@ async function pinterestSearch(q, n = 25) {
     throw new Error('Tidak ada pin ditemukan');
   }
 
-  return pins.slice(0, n).map((p, i) => ({
+  // Potong sesuai limit yang sudah dijamin integer
+  return pins.slice(0, limit).map((p, i) => ({
     n: i + 1,
     id: p.id,
     title: p.title || p.grid_title || p.description?.slice(0, 80) || '(no title)',
@@ -118,7 +122,15 @@ export async function GET(request) {
   const apikey = searchParams.get('apikey');
   const query = searchParams.get('q');
   const limitParam = searchParams.get('limit');
-  const limit = limitParam ? parseInt(limitParam) : 25;
+  
+  // Parsing limit yang aman
+  let limit = 25; // default
+  if (limitParam) {
+    const parsed = parseInt(limitParam, 10);
+    if (!isNaN(parsed)) {
+      limit = parsed;
+    }
+  }
 
   // 1. Validasi API Key
   if (!apikey) {
@@ -180,7 +192,7 @@ export async function GET(request) {
     );
   }
 
-  if (isNaN(limit) || limit < 1 || limit > 100) {
+  if (limit < 1 || limit > 100) {
     await insertLog(400);
     return NextResponse.json(
       { success: false, message: 'Parameter limit harus angka 1-100.' },
