@@ -1,7 +1,7 @@
 // components/ApiCard.jsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 export default function ApiCard({
   method,
@@ -15,14 +15,12 @@ export default function ApiCard({
   const [activeTab, setActiveTab] = useState('params');
   const [copied, setCopied] = useState(false);
 
-  // State baru untuk fitur "Try it!"
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [paramInputs, setParamInputs] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [realResponse, setRealResponse] = useState('');
   const [tryError, setTryError] = useState('');
 
-  // Inisialisasi paramInputs setiap kali params berubah
   useEffect(() => {
     if (params && params.length > 0) {
       const initial = {};
@@ -34,6 +32,31 @@ export default function ApiCard({
       setParamInputs({});
     }
   }, [params]);
+
+  // Generate contoh kode JS Fetch dan Curl berdasarkan endpoint dan params
+  const generatedExample = useMemo(() => {
+    const baseUrl = `https://api.xt4.example.com${endpoint}`; // ganti dengan domain produksi jika ada
+    const queryParams = params
+      ? params
+          .filter((p) => p.example)
+          .map((p) => `${p.name}=${encodeURIComponent(p.example)}`)
+          .join('&')
+      : '';
+    const fullUrl = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
+
+    const jsFetch = `fetch('${fullUrl}', {
+  method: '${method}',
+  headers: { 'Content-Type': 'application/json' }
+})
+  .then(res => res.json())
+  .then(data => console.log(data))
+  .catch(err => console.error(err));`;
+
+    const curl = `curl -X ${method} "${fullUrl}" \\
+  -H "Content-Type: application/json"`;
+
+    return { jsFetch, curl };
+  }, [endpoint, method, params]);
 
   const copyEndpoint = () => {
     navigator.clipboard.writeText(endpoint);
@@ -48,13 +71,11 @@ export default function ApiCard({
   const handleTryIt = async () => {
     setTryError('');
 
-    // Validasi API Key wajib
     if (!apiKeyInput.trim()) {
       setTryError('API Key wajib diisi.');
       return;
     }
 
-    // Validasi parameter required
     if (params) {
       for (const param of params) {
         if (param.required && !paramInputs[param.name]?.trim()) {
@@ -67,11 +88,9 @@ export default function ApiCard({
     setIsLoading(true);
 
     try {
-      // Bangun URL dengan search params
       const url = new URL(endpoint, window.location.origin);
       url.searchParams.append('apikey', apiKeyInput.trim());
 
-      // Tambahkan semua parameter dari input
       Object.entries(paramInputs).forEach(([key, value]) => {
         if (value.trim()) {
           url.searchParams.append(key, value.trim());
@@ -96,7 +115,6 @@ export default function ApiCard({
     POST: 'bg-blue-900/40 text-blue-400 border-blue-600',
   };
 
-  // Menentukan response yang akan ditampilkan: realResponse atau default responseJson
   const displayResponse = realResponse
     ? realResponse
     : typeof responseJson === 'string'
@@ -212,11 +230,9 @@ export default function ApiCard({
                   </table>
                 )}
 
-                {/* Form Uji Coba */}
                 <div className="mt-6 space-y-3">
                   <h4 className="text-pure-white font-medium text-sm">Coba Endpoint</h4>
 
-                  {/* Input API Key wajib di paling atas */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <label className="text-sm text-text-secondary sm:w-24">apikey</label>
                     <div className="flex-1 relative">
@@ -231,7 +247,6 @@ export default function ApiCard({
                     </div>
                   </div>
 
-                  {/* Input parameter lainnya dari database */}
                   {params &&
                     params.map((param, idx) => (
                       <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -265,8 +280,19 @@ export default function ApiCard({
             )}
 
             {activeTab === 'example' && (
-              <div className="bg-pure-black rounded-lg border border-border-dark p-4 overflow-x-auto">
-                <pre className="text-sm text-gray-300 font-mono"><code>{exampleCode}</code></pre>
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-pure-white font-medium text-sm mb-2">JavaScript Fetch</h4>
+                  <div className="bg-pure-black rounded-lg border border-border-dark p-4 overflow-x-auto">
+                    <pre className="text-sm text-gray-300 font-mono"><code>{generatedExample.jsFetch}</code></pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-pure-white font-medium text-sm mb-2">cURL</h4>
+                  <div className="bg-pure-black rounded-lg border border-border-dark p-4 overflow-x-auto">
+                    <pre className="text-sm text-gray-300 font-mono"><code>{generatedExample.curl}</code></pre>
+                  </div>
+                </div>
               </div>
             )}
 
