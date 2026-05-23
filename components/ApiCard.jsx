@@ -33,16 +33,22 @@ export default function ApiCard({
     }
   }, [params]);
 
-  // Generate contoh kode JS Fetch dan Curl berdasarkan endpoint dan params
+  // Generate contoh kode JS Fetch dan Curl dengan baseUrl dinamis
   const generatedExample = useMemo(() => {
-    const baseUrl = `https://api.xt4.example.com${endpoint}`; // ganti dengan domain produksi jika ada
-    const queryParams = params
-      ? params
-          .filter((p) => p.example)
-          .map((p) => `${p.name}=${encodeURIComponent(p.example)}`)
-          .join('&')
-      : '';
-    const fullUrl = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://kiru.my.id';
+    const queryParts = [];
+    queryParts.push('apikey=YOUR_API_KEY');
+    if (params) {
+      params.forEach((p) => {
+        if (p.example) {
+          queryParts.push(`${p.name}=${encodeURIComponent(p.example)}`);
+        } else {
+          queryParts.push(`${p.name}=...`);
+        }
+      });
+    }
+    const queryString = queryParts.join('&');
+    const fullUrl = `${baseUrl}${endpoint}?${queryString}`;
 
     const jsFetch = `fetch('${fullUrl}', {
   method: '${method}',
@@ -57,6 +63,28 @@ export default function ApiCard({
 
     return { jsFetch, curl };
   }, [endpoint, method, params]);
+
+  // Fungsi untuk memberikan highlight sintaks sederhana dengan class Tailwind
+  const highlightSyntax = (code, type = 'js') => {
+    if (!code) return '';
+    // Untuk JavaScript: warnai kata kunci fetch, then, catch, method, headers, =>, console, dll
+    let colored = code;
+    if (type === 'js') {
+      colored = colored
+        .replace(/\b(fetch)\b/g, '<span class="text-blue-400">$1</span>')
+        .replace(/\b(method|headers)\b/g, '<span class="text-purple-400">$1</span>')
+        .replace(/\b(then|catch|res|json|data|err|console|log|error)\b/g, '<span class="text-yellow-400">$1</span>')
+        .replace(/('.*?')/g, '<span class="text-green-400">$1</span>')
+        .replace(/(=&gt;|{|})/g, '<span class="text-gray-400">$1</span>');
+    } else if (type === 'curl') {
+      colored = colored
+        .replace(/\b(curl)\b/g, '<span class="text-blue-400">$1</span>')
+        .replace(/-X\s+\w+/g, '<span class="text-purple-400">$&</span>')
+        .replace(/-H\s+"[^"]*"/g, '<span class="text-green-400">$&</span>')
+        .replace(/("[^"]*")/g, '<span class="text-green-400">$1</span>');
+    }
+    return colored;
+  };
 
   const copyEndpoint = () => {
     navigator.clipboard.writeText(endpoint);
@@ -284,13 +312,17 @@ export default function ApiCard({
                 <div>
                   <h4 className="text-pure-white font-medium text-sm mb-2">JavaScript Fetch</h4>
                   <div className="bg-pure-black rounded-lg border border-border-dark p-4 overflow-x-auto">
-                    <pre className="text-sm text-gray-300 font-mono"><code>{generatedExample.jsFetch}</code></pre>
+                    <pre className="text-sm font-mono">
+                      <code dangerouslySetInnerHTML={{ __html: highlightSyntax(generatedExample.jsFetch, 'js') }} />
+                    </pre>
                   </div>
                 </div>
                 <div>
                   <h4 className="text-pure-white font-medium text-sm mb-2">cURL</h4>
                   <div className="bg-pure-black rounded-lg border border-border-dark p-4 overflow-x-auto">
-                    <pre className="text-sm text-gray-300 font-mono"><code>{generatedExample.curl}</code></pre>
+                    <pre className="text-sm font-mono">
+                      <code dangerouslySetInnerHTML={{ __html: highlightSyntax(generatedExample.curl, 'curl') }} />
+                    </pre>
                   </div>
                 </div>
               </div>
