@@ -10,6 +10,7 @@ export default function UpgradePage() {
   const [submitted, setSubmitted] = useState(false);
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const getSession = async () => {
@@ -33,62 +34,67 @@ export default function UpgradePage() {
       return;
     }
 
+    setIsSubmitting(true);
     let proofUrl = null;
 
-    // Upload file ke Supabase Storage jika ada
-    if (file) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('bukti_transfer')
-        .upload(fileName, file);
+    try {
+      // Upload file ke Supabase Storage jika ada
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${userId}/${Date.now()}.${fileExt}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('bukti_transfer')
+          .upload(fileName, file);
 
-      if (uploadError) {
-        alert('Gagal mengunggah bukti: ' + uploadError.message);
+        if (uploadError) {
+          alert('Gagal mengunggah bukti: ' + uploadError.message);
+          return;
+        }
+
+        // Dapatkan URL publik
+        const { data: publicUrlData } = supabase.storage
+          .from('bukti_transfer')
+          .getPublicUrl(fileName);
+
+        proofUrl = publicUrlData.publicUrl;
+      }
+
+      // Insert ke database (sertakan proof_url jika ada)
+      const { error } = await supabase
+        .from('upgrade_requests')
+        .insert([
+          {
+            user_id: userId,
+            requested_role: role,
+            discord_notes: proofUrl ? `Bukti: ${proofUrl} | ${username}` : username,
+          },
+        ]);
+
+      if (error) {
+        alert('Gagal mengirim request: ' + error.message);
         return;
       }
 
-      // Dapatkan URL publik
-      const { data: publicUrlData } = supabase.storage
-        .from('bukti_transfer')
-        .getPublicUrl(fileName);
+      // Panggil webhook internal dengan proofUrl
+      try {
+        await fetch('/api/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: username,
+            roleTujuan: role,
+            catatan: username,
+            proofUrl: proofUrl,
+          }),
+        });
+      } catch (webhookError) {
+        console.error('Gagal memanggil webhook:', webhookError);
+      }
 
-      proofUrl = publicUrlData.publicUrl;
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Insert ke database (sertakan proof_url jika ada)
-    const { error } = await supabase
-      .from('upgrade_requests')
-      .insert([
-        {
-          user_id: userId,
-          requested_role: role,
-          discord_notes: proofUrl ? `Bukti: ${proofUrl} | ${username}` : username,
-        },
-      ]);
-
-    if (error) {
-      alert('Gagal mengirim request: ' + error.message);
-      return;
-    }
-
-    // Panggil webhook internal dengan proofUrl
-    try {
-      await fetch('/api/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: username,
-          roleTujuan: role,
-          catatan: username,
-          proofUrl: proofUrl, // kirim URL gambar bukti
-        }),
-      });
-    } catch (webhookError) {
-      console.error('Gagal memanggil webhook:', webhookError);
-    }
-
-    setSubmitted(true);
   };
 
   if (loading) {
@@ -168,9 +174,12 @@ export default function UpgradePage() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+            disabled={isSubmitting}
+            className={`w-full py-3 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 transition-colors ${
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
-            Kirim Bukti Pembayaran
+            {isSubmitting ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
           </button>
         </form>
       ) : (
