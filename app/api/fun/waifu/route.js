@@ -11,7 +11,6 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const apikey = searchParams.get('apikey');
 
-  // Ambil gender dari 'gender' atau 'genre', sanitasi kutipan
   let gender = searchParams.get('gender') || searchParams.get('genre');
   if (gender) {
     gender = gender.replace(/['"]/g, '').toLowerCase().trim();
@@ -44,10 +43,23 @@ export async function GET(request) {
     );
   }
 
+  // Ambil userId untuk pencatatan log
+  const { data: keyData } = await supabaseAdmin
+    .from('api_keys')
+    .select('user_id')
+    .eq('api_key', apikey)
+    .maybeSingle();
+
   if (!gender || (gender !== 'cowo' && gender !== 'cewe')) {
+    // Log kegagalan validasi (400)
+    if (keyData?.user_id) {
+      await supabaseAdmin.from('api_logs').insert([
+        { user_id: keyData.user_id, endpoint: '/api/fun/waifu', method: 'GET', status_code: 400 }
+      ]);
+    }
     return NextResponse.json(
       { success: false, message: 'Gender harus "cowo" atau "cewe".' },
-      { status: 400 } // sudah benar 400
+      { status: 400 }
     );
   }
 
@@ -58,6 +70,12 @@ export async function GET(request) {
 
   if (dbError) {
     console.error('Database error:', dbError.message);
+    // Log kegagalan server
+    if (keyData?.user_id) {
+      await supabaseAdmin.from('api_logs').insert([
+        { user_id: keyData.user_id, endpoint: '/api/fun/waifu', method: 'GET', status_code: 500 }
+      ]);
+    }
     return NextResponse.json(
       { success: false, message: 'Gagal mengambil data karakter.' },
       { status: 500 }
@@ -65,6 +83,11 @@ export async function GET(request) {
   }
 
   if (!characters || characters.length === 0) {
+    if (keyData?.user_id) {
+      await supabaseAdmin.from('api_logs').insert([
+        { user_id: keyData.user_id, endpoint: '/api/fun/waifu', method: 'GET', status_code: 404 }
+      ]);
+    }
     return NextResponse.json(
       { success: false, message: 'Tidak ada karakter tersedia untuk gender tersebut.' },
       { status: 404 }
@@ -73,6 +96,13 @@ export async function GET(request) {
 
   const randomIndex = Math.floor(Math.random() * characters.length);
   const character = characters[randomIndex];
+
+  // Log sukses
+  if (keyData?.user_id) {
+    await supabaseAdmin.from('api_logs').insert([
+      { user_id: keyData.user_id, endpoint: '/api/fun/waifu', method: 'GET', status_code: 200 }
+    ]);
+  }
 
   return NextResponse.json(
     {
