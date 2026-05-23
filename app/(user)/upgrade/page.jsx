@@ -72,7 +72,7 @@ export default function UpgradePage() {
       return;
     }
 
-    // Panggil webhook internal
+    // Panggil webhook internal dengan proofUrl
     try {
       await fetch('/api/webhook', {
         method: 'POST',
@@ -81,6 +81,7 @@ export default function UpgradePage() {
           username: username,
           roleTujuan: role,
           catatan: username,
+          proofUrl: proofUrl, // kirim URL gambar bukti
         }),
       });
     } catch (webhookError) {
@@ -150,7 +151,7 @@ export default function UpgradePage() {
             />
           </div>
 
-          {/* Upload Bukti (sekarang berfungsi penuh) */}
+          {/* Upload Bukti */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Upload Bukti Transfer (Screenshot)
