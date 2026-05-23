@@ -15,7 +15,8 @@
     "react-dom": "^18.3.0",
     "@supabase/supabase-js": "^2.45.0",
     "react-google-recaptcha": "^3.1.0",
-    "@google/generative-ai": "^0.17.0"
+    "axios": "^1.7.9",
+    "@google/generative-ai": "^0.21.0"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",
