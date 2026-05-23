@@ -181,8 +181,8 @@ export default function GodModeUsersPage() {
                       <option value="VIP">VIP</option>
                       <option value="Lord">Lord</option>
                       <option value="King's">King's</option>
-                      <option value="Developer">Developer</option>
                       <option value="admin">Admin</option>
+                      <option value="Developer">Developer</option>
                     </select>
                     <button
                       onClick={() => handleRoleChange(user.id, editingRoles[user.id] || user.role)}
