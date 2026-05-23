@@ -10,6 +10,7 @@ export default function DocsPage() {
 
   useEffect(() => {
     const fetchEndpoints = async () => {
+      // Tidak ada pengecekan session – halaman ini 100% public
       const { data, error } = await supabase
         .from('api_endpoints')
         .select('*')
@@ -22,7 +23,11 @@ export default function DocsPage() {
         // Parsing kolom params dari JSON/text menjadi array objek
         const parsedData = data.map((ep) => ({
           ...ep,
-          params: ep.params ? (typeof ep.params === 'string' ? JSON.parse(ep.params) : ep.params) : [],
+          params: ep.params
+            ? typeof ep.params === 'string'
+              ? JSON.parse(ep.params)
+              : ep.params
+            : [],
         }));
         setApis(parsedData);
       }
@@ -63,9 +68,9 @@ export default function DocsPage() {
           method={api.method}
           endpoint={api.path}
           description={api.name}
-          params={api.params}               // sudah dalam bentuk array setelah parsing
-          exampleCode={api.example_code}    // asumsi ada kolom example_code
-          responseJson={api.response_example} // bisa berupa JSON string/objek
+          params={api.params}
+          exampleCode={api.example_code}
+          responseJson={api.response_example}
         />
       ))}
     </div>
