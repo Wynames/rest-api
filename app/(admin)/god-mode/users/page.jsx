@@ -7,13 +7,15 @@ export default function GodModeUsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Object untuk menyimpan role yang dipilih per user (sebelum disimpan)
+  const [editingRoles, setEditingRoles] = useState({});
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('users')
-        .select('id, username, email, role, status')
+        .select('id, username, email, role, limit_harian, status')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -29,7 +31,6 @@ export default function GodModeUsersPage() {
     fetchUsers();
   }, []);
 
-  // Handler untuk BANNED: ubah status menjadi 'Banned'
   const handleBan = async (userId) => {
     const { error } = await supabase
       .from('users')
@@ -40,11 +41,9 @@ export default function GodModeUsersPage() {
       alert('Gagal melakukan banned: ' + error.message);
       return;
     }
-    // Segarkan data
     fetchUsers();
   };
 
-  // Handler untuk PROSES: ubah status 'Menunggu' menjadi 'Active'
   const handleProcess = async (userId) => {
     const { error } = await supabase
       .from('users')
@@ -57,6 +56,35 @@ export default function GodModeUsersPage() {
     }
     fetchUsers();
   };
+
+  // Mengubah role user
+  const handleRoleChange = async (userId, newRole) => {
+    const { error } = await supabase
+      .from('users')
+      .update({ role: newRole })
+      .eq('id', userId);
+
+    if (error) {
+      alert('Gagal mengubah role: ' + error.message);
+      return;
+    }
+    // Hapus dari editingRoles dan refresh
+    setEditingRoles((prev) => {
+      const updated = { ...prev };
+      delete updated[userId];
+      return updated;
+    });
+    fetchUsers();
+  };
+
+  // Inisialisasi editingRoles saat users berubah
+  useEffect(() => {
+    const initial = {};
+    users.forEach((user) => {
+      initial[user.id] = user.role;
+    });
+    setEditingRoles(initial);
+  }, [users]);
 
   if (loading) {
     return (
@@ -79,7 +107,7 @@ export default function GodModeUsersPage() {
       <div>
         <h1 className="text-3xl font-bold text-pure-white">Manajemen User</h1>
         <p className="text-text-secondary mt-1">
-          Kelola seluruh pengguna terdaftar, terima upgrade, atau banned akun.
+          Kelola seluruh pengguna terdaftar, edit role, terima upgrade, atau banned akun.
         </p>
       </div>
 
@@ -91,6 +119,7 @@ export default function GodModeUsersPage() {
               <th className="pb-3 font-medium">Username</th>
               <th className="pb-3 font-medium">Email</th>
               <th className="pb-3 font-medium">Role</th>
+              <th className="pb-3 font-medium">Limit Harian</th>
               <th className="pb-3 font-medium">Status</th>
               <th className="pb-3 font-medium">Aksi</th>
             </tr>
@@ -113,12 +142,15 @@ export default function GodModeUsersPage() {
                         ? 'bg-purple-500/20 text-purple-400'
                         : user.role === 'VIP'
                         ? 'bg-blue-500/20 text-blue-400'
+                        : user.role === 'Developer' || user.role === 'admin'
+                        ? 'bg-pink-500/20 text-pink-400'
                         : 'bg-gray-500/20 text-gray-400'
                     }`}
                   >
                     {user.role}
                   </span>
                 </td>
+                <td className="py-3 text-text-secondary">{user.limit_harian}</td>
                 <td className="py-3">
                   <span
                     className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
@@ -134,6 +166,31 @@ export default function GodModeUsersPage() {
                 </td>
                 <td className="py-3">
                   <div className="flex items-center gap-2">
+                    {/* Dropdown edit role */}
+                    <select
+                      value={editingRoles[user.id] || user.role}
+                      onChange={(e) =>
+                        setEditingRoles((prev) => ({
+                          ...prev,
+                          [user.id]: e.target.value,
+                        }))
+                      }
+                      className="bg-pure-black border border-border-dark rounded px-2 py-1 text-xs text-pure-white focus:outline-none focus:border-pure-white"
+                    >
+                      <option value="Free">Free</option>
+                      <option value="VIP">VIP</option>
+                      <option value="Lord">Lord</option>
+                      <option value="King's">King's</option>
+                      <option value="Developer">Developer</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button
+                      onClick={() => handleRoleChange(user.id, editingRoles[user.id] || user.role)}
+                      className="px-3 py-1 rounded text-xs font-medium bg-white text-pure-black hover:bg-gray-200 transition-colors"
+                    >
+                      Simpan Role
+                    </button>
+
                     {user.status === 'Menunggu' && (
                       <button
                         onClick={() => handleProcess(user.id)}
@@ -162,7 +219,7 @@ export default function GodModeUsersPage() {
       </div>
 
       <p className="text-text-secondary text-xs">
-        * Perubahan status langsung tersimpan ke database.
+        * Perubahan role akan otomatis menyesuaikan limit harian melalui trigger database.
       </p>
     </div>
   );
