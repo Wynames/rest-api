@@ -15,12 +15,10 @@ export default function GodModePage() {
   const fetchData = async () => {
     setLoading(true);
 
-    // Total user
     const { count: totalUser, error: countError } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
 
-    // Query dengan join ke tabel users menggunakan sintaks Supabase
     const { data: upgrades, error: upgradeError } = await supabase
       .from('upgrade_requests')
       .select('*, users(username, email)')
@@ -43,30 +41,18 @@ export default function GodModePage() {
   }, []);
 
   const handleApprove = async (requestId, userId, requestedRole) => {
-    // Update role user di tabel users (trigger akan menyesuaikan limit_harian)
-    const { error: updateUserError } = await supabase
-      .from('users')
-      .update({ role: requestedRole })
-      .eq('id', userId);
+    const { error } = await supabase.rpc('approve_upgrade', {
+      req_id: requestId,
+      target_user_id: userId,
+      new_role: requestedRole,
+    });
 
-    if (updateUserError) {
-      alert('Gagal memperbarui user: ' + updateUserError.message);
+    if (error) {
+      alert('Gagal memperbarui: ' + error.message);
       return;
     }
 
-    // Update status request menjadi Approved
-    const { error: updateReqError } = await supabase
-      .from('upgrade_requests')
-      .update({ status: 'Approved' })
-      .eq('id', requestId);
-
-    if (updateReqError) {
-      alert('Gagal mengubah status request: ' + updateReqError.message);
-      return;
-    }
-
-    // Segarkan data
-    fetchData();
+    fetchData(); // refresh
   };
 
   if (loading) {
@@ -79,13 +65,11 @@ export default function GodModePage() {
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 space-y-10">
-      {/* Header Admin */}
       <div>
         <h1 className="text-3xl font-bold text-white">God Mode Dashboard</h1>
         <p className="text-gray-400 mt-1">Panel kontrol utama untuk Administrator.</p>
       </div>
 
-      {/* Kotak Statistik */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Total User</p>
@@ -101,7 +85,6 @@ export default function GodModePage() {
         </div>
       </div>
 
-      {/* Tabel Daftar Request Upgrade */}
       <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
         <h2 className="text-xl font-semibold text-white mb-4">Daftar Request Upgrade Tertunda</h2>
         {pendingUpgrades.length === 0 ? (
