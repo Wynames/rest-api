@@ -71,7 +71,7 @@ export async function GET(request) {
         await supabaseAdmin.from('api_logs').insert([
             {
                 user_id: userId,
-                endpoint: '/api/nekopoi/search',
+                endpoint: '/api/anime/kucing-search',
                 method: 'GET',
                 status_code: statusCode
             }
