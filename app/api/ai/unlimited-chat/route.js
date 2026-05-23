@@ -9,15 +9,23 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ======================= HELPER FUNCTIONS =======================
+// ======================= HELPERS =======================
 function uuid() {
   return crypto.randomUUID();
 }
 
 function parseNDJSON(raw) {
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    throw new Error('Respons dari server AI kosong atau tidak valid');
+  }
+
   let fullText = "";
   const chunks = [];
   const lines = raw.split("\n").map(v => v.trim()).filter(Boolean);
+
+  if (lines.length === 0) {
+    throw new Error('Respons NDJSON kosong');
+  }
 
   for (const line of lines) {
     try {
@@ -26,14 +34,20 @@ function parseNDJSON(raw) {
       if (json.type === "delta" && json.delta) {
         fullText += json.delta;
       }
-    } catch {}
+    } catch {
+      // abaikan baris yang bukan JSON valid
+    }
+  }
+
+  if (!fullText && chunks.length === 0) {
+    throw new Error('Gagal mengekstrak teks dari respons NDJSON');
   }
 
   return { text: fullText, chunks };
 }
 
 async function unlimitedAiChat(prompt, options = {}) {
-  if (!prompt) {
+  if (!prompt || !prompt.trim()) {
     throw new Error("Prompt wajib diisi");
   }
 
@@ -65,25 +79,54 @@ async function unlimitedAiChat(prompt, options = {}) {
     locale: options.locale || "id"
   };
 
-  const { data } = await axios.post(
-    "https://app.unlimitedai.chat/api/chat",
-    payload,
-    {
-      headers: {
-        "content-type": "application/json",
-        accept: "application/x-ndjson, application/json, text/plain, */*",
-        "x-next-intl-locale": payload.locale,
-        origin: "https://app.unlimitedai.chat",
-        referer: "https://app.unlimitedai.chat/",
-        "user-agent":
-          "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-      },
-      responseType: "text"
+  // Gunakan axios dengan responseType 'text', pastikan dapat data mentah
+  let response;
+  try {
+    response = await axios.post(
+      "https://app.unlimitedai.chat/api/chat",
+      payload,
+      {
+        headers: {
+          "content-type": "application/json",
+          accept: "application/x-ndjson, application/json, text/plain, */*",
+          "x-next-intl-locale": payload.locale,
+          origin: "https://app.unlimitedai.chat",
+          referer: "https://app.unlimitedai.chat/",
+          "user-agent":
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        },
+        responseType: "text"
+      }
+    );
+  } catch (err) {
+    // Tangani error dari axios (timeout, network, dll)
+    console.error('Error saat request ke AI:', err.message);
+    if (err.response) {
+      // Server unlimitedai merespons dengan status error
+      throw new Error(`AI server error: ${err.response.status} - ${JSON.stringify(err.response.data).slice(0, 200)}`);
+    } else if (err.request) {
+      throw new Error('Tidak ada respons dari server AI (network error)');
+    } else {
+      throw err;
     }
-  );
+  }
 
-  const parsed = parseNDJSON(data);
-  return { chatId, answer: parsed.text };
+  // Periksa apakah data ada
+  if (!response.data) {
+    throw new Error('Respons dari server AI kosong');
+  }
+
+  // Parse NDJSON
+  const parsed = parseNDJSON(response.data);
+  
+  if (!parsed.text) {
+    throw new Error('Tidak dapat mengekstrak jawaban dari respons AI');
+  }
+
+  return {
+    chatId,
+    answer: parsed.text
+  };
 }
 
 // ======================= API ROUTE HANDLER (POST) =======================
@@ -142,10 +185,9 @@ export async function POST(request) {
     );
   }
 
-  // 4. Ambil body JSON dengan aman (hindari "Unexpected end of JSON input")
+  // 4. Ambil body JSON dengan aman
   let body;
   try {
-    // Cek apakah request memiliki body
     const contentLength = request.headers.get('content-length');
     if (!contentLength || parseInt(contentLength) === 0) {
       await insertLog(400);
@@ -154,7 +196,6 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-
     body = await request.json();
   } catch (err) {
     await insertLog(400);
@@ -164,8 +205,15 @@ export async function POST(request) {
     );
   }
 
-  const prompt = body?.prompt?.trim();
+  if (!body || typeof body !== 'object') {
+    await insertLog(400);
+    return NextResponse.json(
+      { success: false, message: "Request body harus berupa JSON object." },
+      { status: 400 }
+    );
+  }
 
+  const prompt = (body.prompt || '').trim();
   if (!prompt) {
     await insertLog(400);
     return NextResponse.json(
@@ -177,10 +225,10 @@ export async function POST(request) {
   // 5. Panggil AI
   try {
     const options = {
-      chatId: body.chatId,
-      model: body.model,
-      deviceId: body.deviceId,
-      locale: body.locale
+      chatId: body.chatId || undefined,
+      model: body.model || undefined,
+      deviceId: body.deviceId || undefined,
+      locale: body.locale || undefined
     };
 
     const result = await unlimitedAiChat(prompt, options);
