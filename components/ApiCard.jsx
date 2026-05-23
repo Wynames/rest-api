@@ -37,7 +37,8 @@ export default function ApiCard({
   const generatedExample = useMemo(() => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://kiru.my.id';
     const queryParts = [];
-    queryParts.push('apikey=YOUR_API_KEY');
+    // Gunakan API key yang diketik user, atau fallback 'YOUR_API_KEY'
+    queryParts.push('apikey=' + (apiKeyInput || 'YOUR_API_KEY'));
     if (params) {
       params.forEach((p) => {
         if (p.example) {
@@ -62,12 +63,11 @@ export default function ApiCard({
   -H "Content-Type: application/json"`;
 
     return { jsFetch, curl };
-  }, [endpoint, method, params]);
+  }, [endpoint, method, params, apiKeyInput]); // apiKeyInput sebagai dependency
 
   // Fungsi untuk memberikan highlight sintaks sederhana dengan class Tailwind
   const highlightSyntax = (code, type = 'js') => {
     if (!code) return '';
-    // Untuk JavaScript: warnai kata kunci fetch, then, catch, method, headers, =>, console, dll
     let colored = code;
     if (type === 'js') {
       colored = colored
