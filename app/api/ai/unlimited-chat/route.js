@@ -142,14 +142,24 @@ export async function POST(request) {
     );
   }
 
-  // 4. Ambil body JSON
+  // 4. Ambil body JSON dengan aman (hindari "Unexpected end of JSON input")
   let body;
   try {
+    // Cek apakah request memiliki body
+    const contentLength = request.headers.get('content-length');
+    if (!contentLength || parseInt(contentLength) === 0) {
+      await insertLog(400);
+      return NextResponse.json(
+        { success: false, message: "Request body tidak boleh kosong." },
+        { status: 400 }
+      );
+    }
+
     body = await request.json();
-  } catch {
+  } catch (err) {
     await insertLog(400);
     return NextResponse.json(
-      { success: false, message: "Request body harus JSON valid." },
+      { success: false, message: "Request body harus JSON valid. " + err.message },
       { status: 400 }
     );
   }
