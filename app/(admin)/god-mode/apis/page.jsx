@@ -10,10 +10,11 @@ export default function GodModeApisPage() {
     path: '/api/...',
     method: 'GET',
     responseExample: '',
-    params: '', // string JSON
+    params: '',
   });
   const [showAlert, setShowAlert] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -26,7 +27,6 @@ export default function GodModeApisPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Parsing params JSON jika diisi
     let parsedParams = null;
     if (formData.params.trim()) {
       try {
@@ -45,7 +45,7 @@ export default function GodModeApisPage() {
         path: formData.path,
         method: formData.method,
         response_example: formData.responseExample,
-        params: parsedParams, // bisa null atau array objek
+        params: parsedParams,
         is_active: true,
       },
     ]);
@@ -56,7 +56,6 @@ export default function GodModeApisPage() {
       return;
     }
 
-    // Sukses
     setShowAlert(true);
     setFormData({
       name: '',
@@ -68,9 +67,44 @@ export default function GodModeApisPage() {
     });
     setLoading(false);
 
-    setTimeout(() => {
-      setShowAlert(false);
-    }, 3000);
+    setTimeout(() => setShowAlert(false), 3000);
+  };
+
+  const handleAutoGenerate = async () => {
+    if (!formData.name || !formData.path || !formData.method) {
+      alert('Isi Nama API, Path Endpoint, dan Method terlebih dahulu.');
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    try {
+      const res = await fetch('/api/admin/generate-docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: formData.path,
+          method: formData.method,
+          description: formData.name,
+        }),
+      });
+
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.message || 'AI gagal menghasilkan dokumentasi.');
+        return;
+      }
+
+      const { params, responseExample } = json.data;
+      setFormData((prev) => ({
+        ...prev,
+        params: JSON.stringify(params, null, 2),
+        responseExample: typeof responseExample === 'string' ? responseExample : JSON.stringify(responseExample, null, 2),
+      }));
+    } catch (err) {
+      alert('Gagal menghubungi AI: ' + err.message);
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   return (
@@ -165,6 +199,19 @@ export default function GodModeApisPage() {
             <option value="GET">GET</option>
             <option value="POST">POST</option>
           </select>
+        </div>
+
+        {/* Tombol Auto-Generate AI */}
+        <div>
+          <button
+            type="button"
+            onClick={handleAutoGenerate}
+            disabled={isGeneratingAI}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span>✨</span>
+            {isGeneratingAI ? 'Menghasilkan...' : 'Auto-Generate dengan AI'}
+          </button>
         </div>
 
         {/* Parameter JSON (Opsional) */}
