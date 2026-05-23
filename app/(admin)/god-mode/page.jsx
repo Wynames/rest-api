@@ -6,20 +6,12 @@ import { supabase } from '@/lib/supabase';
 export default function GodModePage() {
   const [stats, setStats] = useState({
     totalUser: 0,
-    requestToday: 0, // opsional, bisa diisi nanti
+    requestToday: 0,
     pendingUpgrade: 0,
   });
   const [pendingUpgrades, setPendingUpgrades] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Batas limit sesuai role
-  const roleLimits = {
-    VIP: 500,
-    Lord: 1500,
-    "King's": 5000,
-  };
-
-  // Fetch semua data
   const fetchData = async () => {
     setLoading(true);
 
@@ -28,18 +20,10 @@ export default function GodModePage() {
       .from('users')
       .select('*', { count: 'exact', head: true });
 
-    // Request upgrade yang masih Menunggu, join dengan users untuk username dan email
+    // Query dengan join ke tabel users menggunakan sintaks Supabase
     const { data: upgrades, error: upgradeError } = await supabase
       .from('upgrade_requests')
-      .select(`
-        id,
-        requested_role,
-        discord_notes,
-        status,
-        created_at,
-        user_id,
-        users ( username, email )
-      `)
+      .select('*, users(username, email)')
       .eq('status', 'Menunggu')
       .order('created_at', { ascending: false });
 
@@ -58,19 +42,11 @@ export default function GodModePage() {
     fetchData();
   }, []);
 
-  // Fungsi untuk menyetujui upgrade
   const handleApprove = async (requestId, userId, requestedRole) => {
-    if (!roleLimits[requestedRole]) {
-      alert('Role tidak dikenali.');
-      return;
-    }
-
-    const newLimit = roleLimits[requestedRole];
-
-    // Update tabel users: role dan limit_harian
+    // Update role user di tabel users (trigger akan menyesuaikan limit_harian)
     const { error: updateUserError } = await supabase
       .from('users')
-      .update({ role: requestedRole, limit_harian: newLimit })
+      .update({ role: requestedRole })
       .eq('id', userId);
 
     if (updateUserError) {
@@ -78,7 +54,7 @@ export default function GodModePage() {
       return;
     }
 
-    // Update status upgrade_requests menjadi Approved
+    // Update status request menjadi Approved
     const { error: updateReqError } = await supabase
       .from('upgrade_requests')
       .update({ status: 'Approved' })
@@ -117,7 +93,7 @@ export default function GodModePage() {
         </div>
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Request API Hari Ini</p>
-          <p className="text-3xl font-bold text-white mt-2">—</p> {/* Bisa diisi nanti */}
+          <p className="text-3xl font-bold text-white mt-2">—</p>
         </div>
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Request Upgrade Tertunda</p>
