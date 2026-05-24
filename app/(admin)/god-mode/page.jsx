@@ -1,3 +1,4 @@
+// app/(admin)/god-mode/page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,6 +22,16 @@ export default function GodModePage() {
       .from('users')
       .select('*', { count: 'exact', head: true });
 
+    // Request API hari ini dari api_logs
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString();
+
+    const { count: requestToday, error: logError } = await supabase
+      .from('api_logs')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', todayStr);
+
     // Ambil SEMUA request upgrade (tanpa filter status) untuk debugging
     const { data: upgrades, error: upgradeError } = await supabase
       .from('upgrade_requests')
@@ -33,6 +44,9 @@ export default function GodModePage() {
 
     if (!countError) {
       setStats((prev) => ({ ...prev, totalUser: totalUser ?? 0 }));
+    }
+    if (!logError) {
+      setStats((prev) => ({ ...prev, requestToday: requestToday ?? 0 }));
     }
     if (!upgradeError && upgrades) {
       setPendingUpgrades(upgrades);
@@ -89,7 +103,7 @@ export default function GodModePage() {
         </div>
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Request API Hari Ini</p>
-          <p className="text-3xl font-bold text-white mt-2">—</p>
+          <p className="text-3xl font-bold text-white mt-2">{stats.requestToday}</p>
         </div>
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Request Upgrade Tertunda</p>
