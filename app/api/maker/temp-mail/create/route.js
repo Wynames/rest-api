@@ -33,6 +33,7 @@ async function createMail() {
   };
 }
 
+// Handler POST (asli)
 export async function POST(request) {
   const { searchParams } = new URL(request.url);
   const apikey = searchParams.get('apikey');
@@ -74,4 +75,12 @@ export async function POST(request) {
     await insertLog(500);
     return NextResponse.json({ success: false, message: err.message }, { status: 500 });
   }
+}
+
+// Handler GET (tambahan) -> supaya tidak error 405 saat dibuka di browser
+export async function GET() {
+  return NextResponse.json(
+    { success: false, message: 'Gunakan method POST untuk membuat email baru.' },
+    { status: 405 }
+  );
 }
