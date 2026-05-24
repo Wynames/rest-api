@@ -2,12 +2,16 @@
 import { NextResponse } from 'next/server';
 
 export function middleware(request) {
-  const { pathname, searchParams } = request.nextUrl;
+  const { pathname } = request.nextUrl;
 
-  // Hanya berlaku untuk endpoint di bawah /api/ kecuali /api/webhook
-  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/webhook')) {
-    const apiKey = searchParams.get('apikey');
+  // Biarkan rute admin internal dan webhook lewat tanpa pengecekan API key
+  if (pathname.startsWith('/api/admin/') || pathname.startsWith('/api/webhook')) {
+    return NextResponse.next();
+  }
 
+  // Untuk rute API publik, cek keberadaan API key
+  if (pathname.startsWith('/api/')) {
+    const apiKey = request.nextUrl.searchParams.get('apikey');
     if (!apiKey) {
       return NextResponse.json(
         {
@@ -17,12 +21,11 @@ export function middleware(request) {
         { status: 401 }
       );
     }
-
-    // API key ada, lanjutkan request – validasi database dilakukan di route
+    // Lanjutkan, validasi detail dilakukan di route handler
     return NextResponse.next();
   }
 
-  // Lanjutkan untuk path lainnya
+  // Rute selain /api/ tidak terpengaruh
   return NextResponse.next();
 }
 
