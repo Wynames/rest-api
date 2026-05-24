@@ -33,7 +33,7 @@ async function createMail() {
   };
 }
 
-export async function POST(request) {
+async function handleRequest(request) {
   const { searchParams } = new URL(request.url);
   const apikey = searchParams.get('apikey');
 
@@ -51,7 +51,7 @@ export async function POST(request) {
   const insertLog = async (statusCode) => {
     if (!userId) return;
     await supabaseAdmin.from('api_logs').insert([
-      { user_id: userId, endpoint: '/api/maker/temp-mail/create', method: 'POST', status_code: statusCode }
+      { user_id: userId, endpoint: '/api/maker/temp-mail/create', method: request.method, status_code: statusCode }
     ]);
   };
 
@@ -76,10 +76,10 @@ export async function POST(request) {
   }
 }
 
-// Handler GET untuk beri tahu pengguna
-export async function GET() {
-  return NextResponse.json(
-    { success: false, message: 'Gunakan method POST untuk membuat email baru.' },
-    { status: 405 }
-  );
+export async function POST(request) {
+  return handleRequest(request);
+}
+
+export async function GET(request) {
+  return handleRequest(request);
 }
