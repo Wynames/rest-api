@@ -1,4 +1,3 @@
-// app/(admin)/god-mode/page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -50,7 +49,6 @@ export default function GodModePage() {
     }
     if (!upgradeError && upgrades) {
       setPendingUpgrades(upgrades);
-      // Hitung yang masih 'Menunggu' untuk statistik
       const pendingCount = upgrades.filter((item) => item.status === 'Menunggu').length;
       setStats((prev) => ({ ...prev, pendingUpgrade: pendingCount }));
     }
@@ -62,7 +60,6 @@ export default function GodModePage() {
     fetchData();
   }, []);
 
-  // Fungsi untuk menyetujui upgrade menggunakan RPC bypass RLS
   const handleApprove = async (requestId, userId, requestedRole) => {
     const { error } = await supabase.rpc('approve_upgrade', {
       req_id: requestId,
@@ -75,7 +72,6 @@ export default function GodModePage() {
       return;
     }
 
-    // Segarkan data
     fetchData();
   };
 
@@ -103,6 +99,7 @@ export default function GodModePage() {
         </div>
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
           <p className="text-gray-400 text-sm">Request API Hari Ini</p>
+          {/* Perbaikan: menampilkan angka asli, bukan placeholder "—" */}
           <p className="text-3xl font-bold text-white mt-2">{stats.requestToday}</p>
         </div>
         <div className="border border-[#333333] rounded-xl bg-[#111111] p-6">
