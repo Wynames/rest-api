@@ -34,7 +34,6 @@ export async function POST(request) {
     // Coba parsing JSON dari respon AI
     let data;
     try {
-      // Bersihkan kemungkinan code block markdown
       let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '');
       data = JSON.parse(cleanText);
     } catch (parseError) {
